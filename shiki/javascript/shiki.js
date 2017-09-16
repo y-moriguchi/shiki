@@ -300,6 +300,7 @@
 			me.markPowProcessed = false;
 			me.markPowRight = false;
 			me.markSubPowProcessed = false;
+			me.markSub = false;
 			me.markSubRet = false;
 			me.markSumStart = false;
 			me.markSumSign = false;
@@ -895,7 +896,7 @@
 		function parseEngine(quadro, trans) {
 			var _trans = trans;
 			return function() {
-				var state = _trans.getState("INIT"), obj, s2, count = 0;
+				var state = _trans.getState("INIT"), obj, count = 0;
 				quadro.newModel();
 				while((obj = trans.transit(state, quadro)) != null) {
 					if(typeof obj === 'number') {
@@ -908,11 +909,7 @@
 					}
 
 					if(opt.debug) {
-						opt.debuglog(quadro.get().getChar());
-						if(s2 !== state) {
-							opt.debuglog(trans.getStateName(state % 1000000));
-							s2 = state;
-						}
+						opt.debuglog(trans.getStateName(state % 1000000) + ":" + quadro.get().getChar());
 					}
 
 					if(count++ > opt.iteration) {
@@ -1305,6 +1302,11 @@
 						cell.markPow = false;
 						quadro.moveLeft();
 						return directSum(NEXT_FPOW, st.FPRINTABLE_DRAWTEMP);
+					} else if(cell.markSub) {
+						cell.markSub = false;
+						quadro.moveLeft();
+						quadro.get().markSub = true;
+						return directSum(NEXT_FSUB, st.FPRINTABLE_DRAWTEMP);
 					} else if(cell.getChar() === '-') {
 						quadro.moveRight();
 						return st.FPRINTABLE_MINUS;
@@ -1872,7 +1874,10 @@
 						if(quadro.getCellUp().markAccent) {
 							quadro.get().markProcessed();
 							quadro.moveRight();
-							return st.FPRINTABLE;
+							return st.FPOW_RET_DELTEMP;
+						} else if(cell.markSub) {
+							cell.markSub = false;
+							return st.FPOW_RET_DELTEMP;
 						} else {
 							quadro.moveUp();
 							return st.FPOW_SCAN;
@@ -2800,7 +2805,12 @@
 					}
 				case st.FRET_SUB_FPOW_8:
 					quadro.moveUp();
-					return cell.markTemp ? st.FRET_SUB_FPOW_SCAN : state;
+					if(cell.markTemp) {
+						cell.markSub = false;
+						return st.FRET_SUB_FPOW_SCAN;
+					} else {
+						return state;
+					}
 				case st.FRET_SUB_FPOW_SCAN:
 					if(cell.isOutsideY() ||
 							cell.markMatrixRowSeparator ||
@@ -2958,6 +2968,9 @@
 				case st.FRET_POW_DRAWPROC4:
 					if(cell.isProcessed()) {
 						quadro.moveRight();
+						if(quadro.get().isWhitespace()) {
+							quadro.get().markSub = true;
+						}
 						return st.FPRINTABLE;
 					} else {
 						quadro.moveLeft();
@@ -3261,7 +3274,13 @@
 			this.pow = pow;
 		}
 		Pow.prototype.toLaTeX = function() {
-			return this.value.toLaTeX() + "^{" + this.pow.toLaTeX() + "}";
+			if(this.value instanceof ConcatFormula) {
+				return (this.value.f1.toLaTeX() + "{" +
+						this.value.f2.toLaTeX() + "^{" +
+						this.pow.toLaTeX() + "}}");
+			} else {
+				return this.value.toLaTeX() + "^{" + this.pow.toLaTeX() + "}";
+			}
 		};
 		function PowAfterSub(value, pow) {
 			this.value = value;
