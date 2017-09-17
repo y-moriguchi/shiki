@@ -320,6 +320,9 @@
 			me.markCasesRange = false;
 			me.markCasesStart = false;
 			me.markCasesRowSeparator = false;
+			me.markCmbTemp = false;
+			me.markCmbFound = false;
+			me.markCmbBoundary = false;
 			me.isOutsideX = function() {
 				return ch === -1;
 			};
@@ -954,6 +957,21 @@
 			st.addState("FINIT");
 			st.addState("FPRINTABLE");
 			st.addState("FPRINTABLE_SPC");
+			st.addState("FPRINTABLE_SPC_CMB");
+			st.addState("FPRINTABLE_SPC_CMB_SCAN_NOSUB");
+			st.addState("FPRINTABLE_SPC_CMB_NOSUB_RET_T");
+			st.addState("FPRINTABLE_SPC_CMB_NOSUB_RET_F");
+			st.addState("FPRINTABLE_SPC_CMB_SCAN_NOPOW");
+			st.addState("FPRINTABLE_SPC_CMB_NOPOW_RET_T");
+			st.addState("FPRINTABLE_SPC_CMB_NOPOW_RET_F");
+			st.addState("FPRINTABLE_SPC_CMB_SCAN");
+			st.addState("FPRINTABLE_SPC_CMB_FOUND");
+			st.addState("FPRINTABLE_SPC_CMB_FOUND_2");
+			st.addState("FPRINTABLE_SPC_CMB_FOUND_3");
+			st.addState("FPRINTABLE_SPC_CMB_FOUND_4");
+			st.addState("FPRINTABLE_SPC_CMB_FOUND_5");
+			st.addState("FPRINTABLE_SPC_CMB_FOUND_6");
+			st.addState("FPRINTABLE_SPC_CMB_RET_DOWN");
 			st.addState("FPRINTABLE_SPC_2");
 			st.addState("FPRINTABLE_SPC_3");
 			st.addState("FPRINTABLE_SPC_4");
@@ -1010,6 +1028,8 @@
 			st.addState("FPOW_RET_DELTEMP4");
 			st.addState("FPOW_RET_DELTEMP5");
 			st.addState("FRAC_INIT");
+			st.addState("FRAC_DRAWLINE");
+			st.addState("FRAC_DRAWLINE_2");
 			st.addState("FRAC_BAR_BACK");
 			st.addState("FRAC_SCAN");
 			st.addState("FRAC_SCAN_BACK");
@@ -1106,6 +1126,8 @@
 			st.addState("FRET_FRAC2_1");
 			st.addState("FRET_FRAC2_2");
 			st.addState("FRET_FRAC2_3");
+			st.addState("FRET_FRAC2_4");
+			st.addState("FRET_FRAC2_5");
 			st.addState("FRET_ROOT_DOWN");
 			st.addState("FRET_ROOT_BASE");
 			st.addState("FRET_ROOT_BASE2");
@@ -1127,6 +1149,10 @@
 			st.addState("FRET_MATRIX_DRAW_ROW_LINE");
 			st.addState("FRET_MATRIX_DRAW_ROW_LINE_2");
 			st.addState("FRET_MATRIX_DRAW_ROW_LINE_3");
+			st.addState("FRET_CMB");
+			st.addState("FRET_CMB_2");
+			st.addState("FRET_CMB_3");
+			st.addState("FRET_CMB_4");
 			var NEXT_FSUB = 0;
 			var NEXT_ROOT = 1000000;
 			var NEXT_FPOW = 2000000;
@@ -1286,7 +1312,8 @@
 				case st.FPRINTABLE:
 					if(cell.isOutsideX() ||
 							cell.markMatrixRange ||
-							cell.markCasesRange) {
+							cell.markCasesRange ||
+							cell.markCmbBoundary) {
 						quadro.moveLeft();
 						return st.FPRINTABLE_RET;
 					} else if(cell.markRootNum) {
@@ -1343,7 +1370,8 @@
 				case st.FPRINTABLE_SPC:
 					if(cell.isOutsideX() ||
 							cell.markMatrixRange ||
-							cell.markCasesRange) {
+							cell.markCasesRange ||
+							cell.markCmbBoundary) {
 						quadro.moveLeft().moveLeft();
 						return st.FPRINTABLE_RET;
 					} else if(cell.markRootEnd || cell.markRootWall) {
@@ -1370,10 +1398,180 @@
 						quadro.moveRight();
 						return st.FPRINTABLE;
 					} else if(cell.isWhitespace()) {
-						return st.FPRINTABLE_SPC_2;
+						return st.FPRINTABLE_SPC_CMB;
 					} else {
 						quadro.moveLeft().moveLeft();
 						return st.FPRINTABLE_RET;
+					}
+				case st.FPRINTABLE_SPC_CMB:
+					quadro.moveLeft();
+					quadro.get().markCmbTemp = true;
+					quadro.moveDown();
+					return st.FPRINTABLE_SPC_CMB_SCAN_NOSUB;
+				case st.FPRINTABLE_SPC_CMB_SCAN_NOSUB:
+					if(cell.isOutsideY() ||
+							cell.markMatrixRowSeparator ||
+							cell.markCasesRowSeparator ||
+							cell.isTraversed() ||
+							cell.markSumBase ||
+							cell.markTemp) {
+						quadro.moveUp();
+						return st.FPRINTABLE_SPC_CMB_NOSUB_RET_T;
+					} else if(quadro.isSumInt(1)) {
+						quadro.moveUp();
+						return st.FPRINTABLE_SPC_CMB_NOSUB_RET_F;
+					} else if(cell.isPrintable() && !quadro.isCellBar() && !quadro.isAccent()) {
+						quadro.moveUp();
+						return st.FPRINTABLE_SPC_CMB_NOSUB_RET_F;
+					} else {
+						quadro.moveDown();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_NOSUB_RET_T:
+					if(cell.isOutsideY()) {
+						throw 'InternalError';
+					} if(cell.markCmbTemp) {
+						quadro.moveUp();
+						return st.FPRINTABLE_SPC_CMB_SCAN_NOPOW;
+					} else {
+						quadro.moveUp();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_NOSUB_RET_F:
+					if(cell.isOutsideY()) {
+						throw 'InternalError';
+					} if(cell.markCmbTemp) {
+						cell.markCmbTemp = false;
+						quadro.moveRight();
+						return st.FPRINTABLE_SPC_2;
+					} else {
+						quadro.moveUp();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_SCAN_NOPOW:
+					if(cell.isOutsideY() ||
+							cell.markMatrixRowSeparator ||
+							cell.markCasesRowSeparator ||
+							cell.isTraversed() ||
+							cell.markTemp ||
+							cell.markSumBase) {
+						quadro.moveDown();
+						return st.FPRINTABLE_SPC_CMB_NOPOW_RET_T;
+					} else if(quadro.isSumInt(-1)) {
+						quadro.moveDown();
+						return st.FPRINTABLE_SPC_CMB_NOPOW_RET_F;
+					} else if(cell.isPrintable() && !quadro.isCellBar()) {
+						quadro.moveDown();
+						return st.FPRINTABLE_SPC_CMB_NOPOW_RET_F;
+					} else {
+						quadro.moveUp();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_NOPOW_RET_T:
+					if(cell.isOutsideY()) {
+						throw 'InternalError';
+					} if(cell.markCmbTemp) {
+						cell.markCmbTemp = false;
+						quadro.moveRight();
+						quadro.get().markCmbTemp = true;
+						return st.FPRINTABLE_SPC_CMB_SCAN;
+					} else {
+						quadro.moveDown();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_NOPOW_RET_F:
+					if(cell.isOutsideY()) {
+						throw 'InternalError';
+					} if(cell.markCmbTemp) {
+						cell.markCmbTemp = false;
+						quadro.moveRight();
+						return st.FPRINTABLE_SPC_2;
+					} else {
+						quadro.moveDown();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_SCAN:
+					if(cell.isOutsideY() ||
+							cell.markMatrixRowSeparator ||
+							cell.markCasesRowSeparator ||
+							cell.isTraversed() ||
+							cell.markSumBase ||
+							cell.markTemp) {
+						quadro.moveUp();
+						return st.FPRINTABLE_SPC_CMB_RET_DOWN;
+					} else if(quadro.isSumInt(1)) {
+						quadro.moveDownIfNotMulti();
+						quadro.get().markCmbFound = true;
+						return st.FPRINTABLE_SPC_CMB_FOUND;
+					} else if(cell.isPrintable() && !quadro.isCellBar() && !quadro.isAccent()) {
+						cell.markCmbFound = true;
+						return st.FPRINTABLE_SPC_CMB_FOUND;
+					} else {
+						quadro.moveDown();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_FOUND:
+					if(cell.markCmbTemp) {
+						return st.FPRINTABLE_SPC_CMB_FOUND_2;
+					} else {
+						quadro.moveUp();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_FOUND_2:
+					if(cell.isWhitespace()) {
+						quadro.moveRight();
+						return state;
+					} else {
+						cell.markCmbTemp = true;
+						return st.FPRINTABLE_SPC_CMB_FOUND_3;
+					}
+				case st.FPRINTABLE_SPC_CMB_FOUND_3:
+					if(cell.isOutsideY() ||
+							cell.markMatrixRowSeparator ||
+							cell.markCasesRowSeparator) {
+						quadro.moveUp();
+						return st.FPRINTABLE_SPC_CMB_FOUND_4;
+					} else {
+						cell.markCmbBoundary = true;
+						quadro.moveDown();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_FOUND_4:
+					if(cell.markCmbTemp) {
+						cell.markCmbTemp = false;
+						return st.FPRINTABLE_SPC_CMB_FOUND_5;
+					} else {
+						quadro.moveUp();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_FOUND_5:
+					if(cell.markCmbTemp) {
+						return st.FPRINTABLE_SPC_CMB_FOUND_6;
+					} else {
+						quadro.moveLeft();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_FOUND_6:
+					if(cell.markCmbFound) {
+						cell.markCmbFound = false;
+						cell.markReturn.push('CMB');
+						quadro.flushBuilder();
+						quadro.clearStringBuilder();
+						quadro.newModel();
+						return st.FINIT;
+					} else {
+						quadro.moveDown();
+						return state;
+					}
+				case st.FPRINTABLE_SPC_CMB_RET_DOWN:
+					if(cell.isOutsideY()) {
+						throw 'InternalError';
+					} if(cell.markCmbTemp) {
+						cell.markCmbTemp = false;
+						return st.FPRINTABLE_SPC_2;
+					} else {
+						quadro.moveUp();
+						return state;
 					}
 				case st.FPRINTABLE_SPC_2:
 					if(cell.isOutsideX() ||
@@ -1892,7 +2090,8 @@
 							cell.markCasesRowSeparator ||
 							cell.isTraversed() ||
 							cell.markTemp ||
-							cell.markSumBase) {
+							cell.markSumBase ||
+							cell.markCmbBoundary) {
 						quadro.moveDown().moveLeft();
 						return st.FPOW_RET_DOWN;
 					} else if(quadro.isSumInt(-1)) {
@@ -1956,13 +2155,28 @@
 						return st.FPRINTABLE;
 					}
 				case st.FRAC_INIT:
-					if(cell.getChar() == '-') {
+					if(cell.getChar() === '-') {
 						cell.markProcessed();
 						quadro.moveRight();
 						return state;
 					} else {
+						return st.FRAC_DRAWLINE;
+					}
+				case st.FRAC_DRAWLINE:
+					if(cell.isOutsideX()) {
 						quadro.moveLeft();
+						return st.FRAC_DRAWLINE_2;
+					} else {
+						cell.markTemp = true;
+						quadro.moveRight();
+						return state;
+					}
+				case st.FRAC_DRAWLINE_2:
+					if(cell.getChar() === '-') {
 						return st.FRAC_BAR_BACK;
+					} else {
+						quadro.moveLeft();
+						return state;
 					}
 				case st.FRAC_BAR_BACK:
 					if(cell.markFraction) {
@@ -2744,6 +2958,11 @@
 						quadro.casesCases.push(v1);
 						quadro.moveDown();
 						return st.CASES_SCAN_CASES;
+					case 'CMB':
+						v2 = quadro.popModel();
+						quadro.addModel(new Sub(new Printable("{}"), v2));
+						quadro.clearStringBuilder();
+						return st.FRET_CMB;
 					default:
 						opt.debuglog(cell.markReturn);
 						throw 'Internal Error';
@@ -3014,7 +3233,26 @@
 						quadro.moveRight();
 						return state;
 					} else {
+						return st.FRET_FRAC2_4;
+					}
+				case st.FRET_FRAC2_4:
+					if(cell.isOutsideX() ||
+							cell.markMatrixRange ||
+							cell.markCasesRange) {
+						quadro.moveLeft();
+						return st.FRET_FRAC2_5;
+					} else {
+						cell.markTemp = false;
+						quadro.moveRight();
+						return state;
+					}
+				case st.FRET_FRAC2_5:
+					if(cell.isProcessed()) {
+						quadro.moveRight();
 						return st.FPRINTABLE;
+					} else {
+						quadro.moveLeft();
+						return state;
 					}
 				case st.FRET_ROOT_DOWN:
 					if(cell.markTemp) {
@@ -3206,6 +3444,46 @@
 						return st.MATRIX_SCAN;
 					} else {
 						quadro.moveLeft();
+						return state;
+					}
+				case st.FRET_CMB:
+					if(cell.markCmbTemp) {
+						quadro.getCellLeft().markProcessed();
+						return st.FRET_CMB_2;
+					} else {
+						quadro.moveUp();
+						return state;
+					}
+				case st.FRET_CMB_2:
+					if(cell.isOutsideX() ||
+							cell.markMatrixRange ||
+							cell.markCasesRange) {
+						throw 'Invalid Formula';
+					} else if(cell.isWhitespace()) {
+						cell.markProcessed();
+						quadro.moveRight();
+						return state;
+					} else {
+						cell.markCmbTemp = true;
+						return st.FRET_CMB_3;
+					}
+				case st.FRET_CMB_3:
+					if(cell.isOutsideY() ||
+							cell.markMatrixRowSeparator ||
+							cell.markCasesRowSeparator) {
+						quadro.moveUp();
+						return st.FRET_CMB_4;
+					} else {
+						cell.markCmbBoundary = false;
+						quadro.moveDown();
+						return state;
+					}
+				case st.FRET_CMB_4:
+					if(cell.markCmbTemp) {
+						cell.markCmbTemp = false;
+						return st.FPRINTABLE;
+					} else {
+						quadro.moveUp();
 						return state;
 					}
 				default:
