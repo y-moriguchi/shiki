@@ -954,6 +954,8 @@
 			st.addState("INIT_CHECKARRAY");
 			st.addState("INIT_CHECKARRAY_2");
 			st.addState("INIT_CHECKARRAY_3");
+			st.addState("INIT_CHECKROOT");
+			st.addState("INIT_CHECKROOT_2");
 			st.addState("FINIT");
 			st.addState("FPRINTABLE");
 			st.addState("FPRINTABLE_SPC");
@@ -973,8 +975,6 @@
 			st.addState("FPRINTABLE_SPC_CMB_FOUND_6");
 			st.addState("FPRINTABLE_SPC_CMB_RET_DOWN");
 			st.addState("FPRINTABLE_SPC_2");
-			st.addState("FPRINTABLE_SPC_3");
-			st.addState("FPRINTABLE_SPC_4");
 			st.addState("FPRINTABLE_MINUS");
 			st.addState("FPRINTABLE_V");
 			st.addState("FPRINTABLE_V_SLASH");
@@ -983,11 +983,9 @@
 			st.addState("FPRINTABLE_V_SLASH4");
 			st.addState("FPRINTABLE_V_NUM");
 			st.addState("FPRINTABLE_V_NUMRET");
+			st.addState("FPRINTABLE_V_NUMRET_2");
+			st.addState("FPRINTABLE_V_NUMRET_3");
 			st.addState("FPRINTABLE_V_NUM2");
-			st.addState("FPRINTABLE_V_NUM3");
-			st.addState("FPRINTABLE_V_BRACKET");
-			st.addState("FPRINTABLE_V_BRACKET2");
-			st.addState("FPRINTABLE_V_BRACKET3");
 			st.addState("FPRINTABLE_SUM_ASCII");
 			st.addState("FPRINTABLE_INT_ASCII");
 			st.addState("FPRINTABLE_INT_ASCII_2");
@@ -1133,6 +1131,7 @@
 			st.addState("FRET_ROOT_BASE2");
 			st.addState("FRET_ROOT_NUM");
 			st.addState("FRET_ROOT_NUM2");
+			st.addState("FRET_ROOT_NUM3");
 			st.addState("FRET_SUM_UP");
 			st.addState("FRET_SUM_UP_2");
 			st.addState("FRET_SUM_UP_SCANDOWN");
@@ -1241,9 +1240,8 @@
 						quadro.moveDown();
 						return st.INIT_CHECKARRAY;
 					} else if(cell.isPrintable() && !quadro.isAccent()) {
-						cell.markReturn.push('INIT');
-						quadro.clearStringBuilder();
-						return st.FINIT;
+						quadro.moveDown();
+						return st.INIT_CHECKROOT;
 					} else {
 						quadro.moveDown();
 						return state;
@@ -1295,7 +1293,7 @@
 				case st.INIT_CHECKARRAY_3:
 					if(/[\-\/]/.test(cell.getChar())) {
 						quadro.moveDown();
-						cell.markReturn.push('INIT');
+						quadro.get().markReturn.push('INIT');
 						quadro.clearStringBuilder();
 						return st.FINIT;
 					} else if(cell.getChar() === '|') {
@@ -1306,6 +1304,28 @@
 						cell.markReturn.push('INIT');
 						quadro.clearStringBuilder();
 						return st.FINIT;
+					}
+				case st.INIT_CHECKROOT:
+					if(cell.getChar() === 'v' ||
+							/[\/_]/.test(quadro.getCellRel(1, -1).getChar())) {
+						cell.markReturn.push('INIT');
+						quadro.clearStringBuilder();
+						return st.FINIT;
+					} else if(cell.isPrintable() || cell.isOutsideY()) {
+						quadro.moveUp();
+						return st.INIT_CHECKROOT_2;
+					} else {
+						quadro.moveDown();
+						return state;
+					}
+				case st.INIT_CHECKROOT_2:
+					if(cell.isPrintable()) {
+						cell.markReturn.push('INIT');
+						quadro.clearStringBuilder();
+						return st.FINIT;
+					} else {
+						quadro.moveUp();
+						return state;
 					}
 				case st.FINIT:
 					return st.FPRINTABLE;
@@ -1574,56 +1594,7 @@
 						return state;
 					}
 				case st.FPRINTABLE_SPC_2:
-					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
-							cell.markCasesRange) {
-						return st.FPRINTABLE_RET;
-					} else if(cell.markRootEnd || cell.markRootWall) {
-						return st.FPRINTABLE_RET;
-					} else if(!!(nxt = getSumIntState(quadro))) {
-						return nxt;
-					} else if(cell.isWhitespace()) {
-						quadro.moveRight();
-						return state;
-					} else if(quadro.operator && cell.getChar() == '-') {
-						if(quadro.moveRight().get().getChar() === '-') {
-							quadro.moveLeft().moveLeft();
-							return st.FPRINTABLE_SPC_3;
-						} else {
-							return st.FPRINTABLE_RET;
-						}
-					} else if(quadro.operator && cell.getChar() == 'v') {
-						if(/[_\/]/.test(quadro.moveRight().moveUp().get().getChar())) {
-							quadro.moveLeft().moveDown().moveLeft();
-							return st.FPRINTABLE_SPC_3;
-						} else {
-							return st.FPRINTABLE_RET;
-						}
-					} else {
-						return st.FPRINTABLE_RET;
-					}
-				case st.FPRINTABLE_SPC_3:
-					if(cell.isProcessed()) {
-						quadro.moveRight();
-						return st.FPRINTABLE_SPC_4;
-					} else {
-						quadro.moveLeft();
-						return state;
-					}
-				case st.FPRINTABLE_SPC_4:
-					if(cell.getChar() == '-') {
-						cell.markFraction = true;
-						return st.FRAC_INIT;
-					} else if(cell.getChar() == 'v') {
-						cell.markProcessed();
-						cell.markRoot = true;
-						quadro.moveRight().moveUp();
-						return st.FPRINTABLE_V_SLASH;
-					} else {
-						cell.markProcessed();
-						quadro.moveRight();
-						return state;
-					}
+					return st.FPRINTABLE_RET;
 				case st.FPRINTABLE_MINUS:
 					if(cell.getChar() == '-') {
 						quadro.moveLeft().get().markFraction = true;
@@ -1698,6 +1669,7 @@
 							cell.markMatrixRowSeparator ||
 							cell.markCasesRowSeparator ||
 							cell.isProcessed()) {
+						quadro.moveDown();
 						return st.FPRINTABLE_V_NUMRET;
 					} else if(cell.isPrintable()) {
 						cell.markRootNum = true;
@@ -1707,68 +1679,36 @@
 						return state;
 					}
 				case st.FPRINTABLE_V_NUMRET:
+					if(cell.markRoot || cell.markRootWall) {
+						quadro.moveRight().moveUp();
+						return st.FPRINTABLE_V_NUMRET_2;
+					} else {
+						quadro.moveDown();
+						return state;
+					}
+				case st.FPRINTABLE_V_NUMRET_2:
+					if(cell.getChar() === '_') {
+						quadro.moveLeft().moveDown();
+						return st.FPRINTABLE_V_NUMRET_3;
+					} else {
+						quadro.moveUp();
+						return st.FPRINTABLE_V_NUM;
+					}
+				case st.FPRINTABLE_V_NUMRET_3:
 					if(cell.markRoot) {
 						quadro.flushBuilder();
 						quadro.newModel();
 						return directSum(NEXT_ROOT, st.FPRINTABLE_DRAWTEMP);
 					} else {
-						quadro.moveDown();
+						quadro.moveLeft().moveDown();
 						return state;
 					}
 				case st.FPRINTABLE_V_NUM2:
-					if(cell.getChar() === '}') {
-						return st.FPRINTABLE_V_BRACKET;
-					} else {
-						return st.FPRINTABLE_V_NUM3;
-					}
-				case st.FPRINTABLE_V_NUM3:
-					if(cell.isPrintable()) {
-						quadro.moveLeft();
-						return state;
-					} else {
-						quadro.moveRight();
-						quadro.get().markReturn.push('ROOT_N');
-						quadro.flushBuilder();
-						quadro.clearStringBuilder();
-						quadro.newModel();
-						return st.FINIT;
-					}
-				case st.FPRINTABLE_V_BRACKET:
-					if(cell.getChar() === '{' && !cell.markRootBracket) {
-						cell.markRootBracket = true;
-						quadro.moveRight();
-						return st.FPRINTABLE_V_BRACKET2;
-					} else {
-						quadro.moveLeft();
-						return state;
-					}
-				case st.FPRINTABLE_V_BRACKET2:
-					if(cell.getChar() === '{') {
-						cell.markRootBracketInner = true;
-						quadro.moveRight();
-						return state;
-					} else if(cell.getChar() !== '}' || cell.markRootBracketInner) {
-						quadro.moveRight();
-						return state;
-					} else if(cell.markRootNum) {
-						quadro.moveLeft();
-						return st.FPRINTABLE_V_BRACKET3;
-					} else {
-						cell.markRootBracketInner = true;
-						quadro.moveRight();
-						return state;
-					}
-				case st.FPRINTABLE_V_BRACKET3:
-					if(cell.markRootBracket && !cell.markRootBracketInner) {
-						cell.markReturn.push('ROOT_N');
-						quadro.flushBuilder();
-						quadro.clearStringBuilder();
-						quadro.newModel();
-						return st.FINIT;
-					} else {
-						quadro.moveLeft();
-						return state;
-					}
+					cell.markReturn.push('ROOT_N');
+					quadro.flushBuilder();
+					quadro.clearStringBuilder();
+					quadro.newModel();
+					return st.FINIT;
 				case st.FPRINTABLE_SUM_ASCII:
 					quadro.getCellRel(1,  0).markSumSign = true;
 					quadro.getCellRel(0, -1).markSumSign = true;
@@ -3293,8 +3233,17 @@
 				case st.FRET_ROOT_NUM2:
 					if(cell.markRoot) {
 						return directSum(NEXT_ROOT, st.FPRINTABLE_DRAWTEMP);
+					} else if(cell.markRootWall) {
+						return st.FRET_ROOT_NUM3;
 					} else {
 						quadro.moveDown();
+						return state;
+					}
+				case st.FRET_ROOT_NUM3:
+					if(cell.markRoot) {
+						return directSum(NEXT_ROOT, st.FPRINTABLE_DRAWTEMP);
+					} else {
+						quadro.moveLeft().moveDown();
 						return state;
 					}
 				case st.FRET_SUM_UP:
