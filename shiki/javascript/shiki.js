@@ -489,7 +489,8 @@
 			function isSumMulti() {
 				return (getPosRelChar(0, 0) === '\n' &&
 						(getPosRelChar(1, 0) === 'Σ' || getPosRelChar(1, 0) === '\u2211') &&
-						!getPosRel(1, 0).markSumSign);
+						!getPosRel(1, 0).markSumSign &&
+						getPosRel(2, 0).isWhitespace());
 			}
 			function isIntMulti() {
 				return (getPosRelChar(0, 0) === '\n' &&
@@ -509,7 +510,32 @@
 			function isProdMulti() {
 				return (getPosRelChar(0, 0) === '\n' &&
 						getPosRelChar(1, 0) === 'Π' &&
-						!getPosRel(1, 0).markSumSign);
+						!getPosRel(1, 0).markSumSign &&
+						getPosRel(2, 0).isWhitespace());
+			}
+			function isCupMulti() {
+				return (getPosRelChar(0, 0) === '\n' &&
+						getPosRelChar(1, 0) === '\u222a' &&
+						!getPosRel(1, 0).markSumSign &&
+						getPosRel(2, 0).isWhitespace());
+			}
+			function isCapMulti() {
+				return (getPosRelChar(0, 0) === '\n' &&
+						getPosRelChar(1, 0) === '\u2229' &&
+						!getPosRel(1, 0).markSumSign &&
+						getPosRel(2, 0).isWhitespace());
+			}
+			function isLorMulti() {
+				return (getPosRelChar(0, 0) === '\n' &&
+						getPosRelChar(1, 0) === '\u2228' &&
+						!getPosRel(1, 0).markSumSign &&
+						getPosRel(2, 0).isWhitespace());
+			}
+			function isLandMulti() {
+				return (getPosRelChar(0, 0) === '\n' &&
+						getPosRelChar(1, 0) === '\u2227' &&
+						!getPosRel(1, 0).markSumSign &&
+						getPosRel(2, 0).isWhitespace());
 			}
 			function builderToChar(len) {
 				var j, l, up;
@@ -596,6 +622,17 @@
 					}
 				}
 				return false;
+			};
+			me.hasSuperBound = function() {
+				var y = yPos - 1, cell;
+				for(;; y--) {
+					cell = getPos(xPos, y);
+					if(cell.isPrintable() && cell.markTemp) {
+						return true;
+					} else if(cell.isBoundY() || !cell.isWhitespace()) {
+						return false;
+					}
+				}
 			};
 			me.hasSubScript = function() {
 				var y = yPos + 1, cell;
@@ -865,6 +902,18 @@
 			me.isProdMulti = function() {
 				return isProdMulti();
 			};
+			me.isCupMulti = function() {
+				return isCupMulti();
+			};
+			me.isCapMulti = function() {
+				return isCapMulti();
+			};
+			me.isLorMulti = function() {
+				return isLorMulti();
+			};
+			me.isLandMulti = function() {
+				return isLandMulti();
+			};
 			me.isSumInt = function(yoffset) {
 				return (me.isSumAscii(yoffset) ||
 						me.isIntAscii(yoffset) ||
@@ -874,7 +923,11 @@
 						me.isIntMulti(yoffset) ||
 						me.isDintMulti(yoffset) ||
 						me.isOintMulti(yoffset) ||
-						me.isProdMulti(yoffset));
+						me.isProdMulti(yoffset) ||
+						me.isCupMulti(yoffset) ||
+						me.isCapMulti(yoffset) ||
+						me.isLorMulti(yoffset) ||
+						me.isLandMulti(yoffset));
 			};
 			me.isAccent = function(offset) {
 				var cell,
@@ -1001,6 +1054,10 @@
 			st.addState("FPRINTABLE_DINT_MULTI");
 			st.addState("FPRINTABLE_OINT_MULTI");
 			st.addState("FPRINTABLE_PROD_MULTI");
+			st.addState("FPRINTABLE_CUP_MULTI");
+			st.addState("FPRINTABLE_CAP_MULTI");
+			st.addState("FPRINTABLE_LOR_MULTI");
+			st.addState("FPRINTABLE_LAND_MULTI");
 			st.addState("FPRINTABLE_SUM_INT");
 			st.addState("FPRINTABLE_SUM_BASELINE");
 			st.addState("FPRINTABLE_SUM_BASELINE_2");
@@ -1202,6 +1259,14 @@
 					return st.FPRINTABLE_OINT_MULTI;
 				} else if(quadro.isProdMulti()) {
 					return st.FPRINTABLE_PROD_MULTI;
+				} else if(quadro.isCupMulti()) {
+					return st.FPRINTABLE_CUP_MULTI;
+				} else if(quadro.isCapMulti()) {
+					return st.FPRINTABLE_CAP_MULTI;
+				} else if(quadro.isLorMulti()) {
+					return st.FPRINTABLE_LOR_MULTI;
+				} else if(quadro.isLandMulti()) {
+					return st.FPRINTABLE_LAND_MULTI;
 				} else {
 					return false;
 				}
@@ -1377,7 +1442,7 @@
 							cell.markProcessed();
 							quadro.moveRight();
 							return state;
-						} else if(quadro.hasSuperScript()) {
+						} else if(quadro.hasSuperScript() || quadro.hasSuperBound()) {
 							return st.FPRINTABLE_RET;
 						} else {
 							quadro.moveRight();
@@ -1809,6 +1874,26 @@
 					quadro.getCellRel(0,  0).markSumSign = true;
 					quadro.getCellRel(1,  0).markSumSign = true;
 					quadro.storeMathSign.push('\\prod');
+					return st.FPRINTABLE_SUM_INT;
+				case st.FPRINTABLE_CUP_MULTI:
+					quadro.getCellRel(0,  0).markSumSign = true;
+					quadro.getCellRel(1,  0).markSumSign = true;
+					quadro.storeMathSign.push('\\bigcup');
+					return st.FPRINTABLE_SUM_INT;
+				case st.FPRINTABLE_CAP_MULTI:
+					quadro.getCellRel(0,  0).markSumSign = true;
+					quadro.getCellRel(1,  0).markSumSign = true;
+					quadro.storeMathSign.push('\\bigcap');
+					return st.FPRINTABLE_SUM_INT;
+				case st.FPRINTABLE_LOR_MULTI:
+					quadro.getCellRel(0,  0).markSumSign = true;
+					quadro.getCellRel(1,  0).markSumSign = true;
+					quadro.storeMathSign.push('\\bigvee');
+					return st.FPRINTABLE_SUM_INT;
+				case st.FPRINTABLE_LAND_MULTI:
+					quadro.getCellRel(0,  0).markSumSign = true;
+					quadro.getCellRel(1,  0).markSumSign = true;
+					quadro.storeMathSign.push('\\bigwedge');
 					return st.FPRINTABLE_SUM_INT;
 				case st.FPRINTABLE_SUM_INT:
 					if(cell.isOutsideX() ||
