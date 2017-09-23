@@ -208,9 +208,11 @@
 			'\u2297': '\\otimes',
 			'\u22a5': '\\perp',
 			'\u22bf': '\\triangle',
+			'\u22c5': '\\cdot',
 			'\u22da': '\\lesseqgtr',
 			'\u22db': '\\gtreqless',
-			'\u29bf': '\\odot'
+			'\u29bf': '\\odot',
+			'\u30fb': '\\cdot'
 		};
 		var mathSequence = {
 			' *': '\\times',
@@ -584,6 +586,26 @@
 					return false;
 				}
 			}
+			function hasSuperSubScript(direction) {
+				var y = yPos + direction, cell;
+				for(; !(cell = getPos(xPos, y)).isBoundY(); y += direction) {
+					if(cell.isPrintable() && !me.isCellBar()) {
+						return true;
+					}
+				}
+				return false;
+			}
+			function hasSuperSubBound(direction) {
+				var y = yPos + direction, cell;
+				for(;; y += direction) {
+					cell = getPos(xPos, y);
+					if(cell.isPrintable() && cell.markTemp) {
+						return true;
+					} else if(cell.isBoundY() || !cell.isWhitespace()) {
+						return false;
+					}
+				}
+			}
 			me = {};
 			ilist = input.split(/\n/);
 			for(i = 0; i < ilist.length; i++) {
@@ -631,35 +653,10 @@
 				var cl = me.getCellDown();
 				return (cl.getCharCode() < 0 || cl.isProcessed()) ? ' ' : cl.getChar();
 			};
-			me.hasSuperScript = function() {
-				var y = yPos - 1, cell;
-				for(; !(cell = getPos(xPos, y)).isBoundY(); y--) {
-					if(cell.isPrintable() && !me.isCellBar()) {
-						return true;
-					}
-				}
-				return false;
-			};
-			me.hasSuperBound = function() {
-				var y = yPos - 1, cell;
-				for(;; y--) {
-					cell = getPos(xPos, y);
-					if(cell.isPrintable() && cell.markTemp) {
-						return true;
-					} else if(cell.isBoundY() || !cell.isWhitespace()) {
-						return false;
-					}
-				}
-			};
-			me.hasSubScript = function() {
-				var y = yPos + 1, cell;
-				for(; !(cell = getPos(xPos, y)).isBoundY(); y++) {
-					if(cell.isPrintable() && !me.isCellBar()) {
-						return true;
-					}
-				}
-				return false;
-			};
+			me.hasSuperScript = function() { return hasSuperSubScript(-1); };
+			me.hasSuperBound = function() { return hasSuperSubBound(-1); };
+			me.hasSubScript = function() { return hasSuperSubScript(1); };
+			me.hasSubBound = function() { return hasSuperSubBound(1); };
 			me.isCellBar = function() {
 				var ccl, dcl;
 				ccl = me.get();
@@ -1468,6 +1465,8 @@
 							quadro.moveRight();
 							return state;
 						} else if(quadro.hasSuperScript() || quadro.hasSuperBound()) {
+							return st.FPRINTABLE_RET;
+						} else if(quadro.hasSubScript() || quadro.hasSubBound()) {
 							return st.FPRINTABLE_RET;
 						} else {
 							quadro.moveRight();
