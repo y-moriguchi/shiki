@@ -235,6 +235,7 @@
 			' ~': '\\sim',
 			' ||': '\\parallel',
 			'oo': '\\infty',
+			'...': '\\cdots',
 			'sin': '\\sin',
 			'cos': '\\cos',
 			'tan': '\\tan',
@@ -536,6 +537,22 @@
 						getPosRelChar(1, 0) === '\u2227' &&
 						!getPosRel(1, 0).markSumSign &&
 						getPosRel(2, 0).isWhitespace());
+			}
+			function isVdots() {
+				return (getPosRelChar(0, 0) === '.' &&
+						getPosRelChar(0, 1) === '.' &&
+						getPosRelChar(0, 2) === '.');
+			}
+			function isDdots() {
+				return (getPosRelChar(0, 0) === '.' &&
+						getPosRelChar(0, 1) === ' ' &&
+						getPosRelChar(0, 2) === ' ' &&
+						getPosRelChar(1, 0) === ' ' &&
+						getPosRelChar(1, 1) === '.' &&
+						getPosRelChar(1, 2) === ' ' &&
+						getPosRelChar(2, 0) === ' ' &&
+						getPosRelChar(2, 1) === ' ' &&
+						getPosRelChar(2, 2) === '.');
 			}
 			function builderToChar(len) {
 				var j, l, up;
@@ -887,33 +904,17 @@
 			me.isProdAscii = function(yoffset) {
 				return isProdAscii(yoffset === void(0) ? 0 : yoffset);
 			};
-			me.isSumMulti = function() {
-				return isSumMulti();
-			};
-			me.isIntMulti = function() {
-				return isIntMulti();
-			};
-			me.isDintMulti = function() {
-				return isDintMulti();
-			};
-			me.isOintMulti = function() {
-				return isOintMulti();
-			};
-			me.isProdMulti = function() {
-				return isProdMulti();
-			};
-			me.isCupMulti = function() {
-				return isCupMulti();
-			};
-			me.isCapMulti = function() {
-				return isCapMulti();
-			};
-			me.isLorMulti = function() {
-				return isLorMulti();
-			};
-			me.isLandMulti = function() {
-				return isLandMulti();
-			};
+			me.isSumMulti = function() { return isSumMulti(); };
+			me.isIntMulti = function() { return isIntMulti(); };
+			me.isDintMulti = function() { return isDintMulti(); };
+			me.isOintMulti = function() { return isOintMulti(); };
+			me.isProdMulti = function() { return isProdMulti(); };
+			me.isCupMulti = function() { return isCupMulti(); };
+			me.isCapMulti = function() { return isCapMulti(); };
+			me.isLorMulti = function() { return isLorMulti(); };
+			me.isLandMulti = function() { return isLandMulti(); };
+			me.isVdots = function() { return isVdots(); };
+			me.isDdots = function() { return isDdots(); };
 			me.isSumInt = function(yoffset) {
 				return (me.isSumAscii(yoffset) ||
 						me.isIntAscii(yoffset) ||
@@ -1304,6 +1305,10 @@
 					} else if(/[\|\-\/]/.test(cell.getChar())) {
 						quadro.moveDown();
 						return st.INIT_CHECKARRAY;
+					} else if(cell.getChar() === '.' && cell.getCellDownChar() === '.') {
+						cell.markReturn.push('INIT');
+						quadro.clearStringBuilder();
+						return st.FINIT;
 					} else if(cell.isPrintable() && !quadro.isAccent()) {
 						quadro.moveDown();
 						return st.INIT_CHECKROOT;
@@ -1429,6 +1434,26 @@
 						return st.FPRINTABLE_BAR;
 					} else if(cell.getChar() === '<') {
 						return st.FPRINTABLE_LT;
+					} else if(quadro.isVdots()) {
+						quadro.addModel(new Printable("\\vdots"));
+						quadro.getCellRel(0, 0).markProcessed();
+						quadro.getCellRel(0, 1).markProcessed();
+						quadro.getCellRel(0, 2).markProcessed();
+						quadro.getCellRel(0, 0).markSubPowProcessed = true;
+						quadro.moveRight();
+						return state;
+					} else if(quadro.isDdots()) {
+						quadro.addModel(new Printable("\\ddots"));
+						quadro.getCellRel(0, 0).markProcessed();
+						quadro.getCellRel(1, 0).markProcessed();
+						quadro.getCellRel(2, 0).markProcessed();
+						quadro.getCellRel(1, 1).markProcessed();
+						quadro.getCellRel(2, 2).markProcessed();
+						quadro.getCellRel(0, 0).markSubPowProcessed = true;
+						quadro.getCellRel(1, 0).markSubPowProcessed = true;
+						quadro.getCellRel(2, 0).markSubPowProcessed = true;
+						quadro.moveRight().moveRight().moveRight();
+						return state;
 					} else if(!!(nxt = getSumIntState(quadro))) {
 						return nxt;
 					} else if(cell.isPrintable()) {
@@ -2529,6 +2554,14 @@
 						quadro.clearStringBuilder();
 						quadro.newModel();
 						return st.FINIT;
+					} else if(cell.getChar() === '.' &&
+							quadro.getCellDown().getChar() === '.' &&
+							!cell.isProcessed()) {
+						cell.markMatrixProcessed = true;
+						cell.markReturn.push('MATRIX_FIRSTCOL');
+						quadro.clearStringBuilder();
+						quadro.newModel();
+						return st.FINIT;
 					} else if(cell.isPrintable() &&
 							!cell.isProcessed() &&
 							!cell.markSumSign &&
@@ -2565,6 +2598,14 @@
 						quadro.moveDownIfNotMulti();
 						quadro.get().markMatrixProcessed = true;
 						quadro.get().markReturn.push('MATRIX');
+						quadro.clearStringBuilder();
+						quadro.newModel();
+						return st.FINIT;
+					} else if(cell.getChar() === '.' &&
+							quadro.getCellDown().getChar() === '.' &&
+							!cell.isProcessed()) {
+						cell.markMatrixProcessed = true;
+						cell.markReturn.push('MATRIX');
 						quadro.clearStringBuilder();
 						quadro.newModel();
 						return st.FINIT;
