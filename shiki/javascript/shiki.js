@@ -20,7 +20,9 @@
 		mathBytes: 2,
 		debuglog: console.log,
 		iteration: 100000,
-		className: "shiki"
+		className: "shiki",
+		useAtAsRoundD: true,
+		useQuantumBracket: true
 	};
 	function extend(base, extension) {
 		var i, res = {};
@@ -392,7 +394,10 @@
 				beforech = false,
 				texcharFn = false,
 				istex = false,
-				boldmath = false;
+				boldmath = false,
+				boldskip = false,
+				boldFn,
+				quantumBracket = false;
 			upfunctions = {
 				'_': function(x) { return "\\bar{" + x + "}"; },
 				'~': function(x) { return "\\tilde{" + x + "}"; },
@@ -403,6 +408,11 @@
 				'`': function(x) { return "\\grave{" + x + "}"; },
 				'=': function(x) { return "\\bar{\\bar{" + x + "}}"; },
 				'-': function(x) { return "\\vec{" + x + "}"; }
+			};
+			boldFn = {
+				'|': function(x) { return new MathDecorate(x, "\\mathbb"); },
+				'/': function(x) { return new MathDecorate(x, "\\mathcal"); },
+				'*': function(x) { return new MathDecorate(x, "\\mathfrak"); }
 			};
 			function getUpfunction() {
 				var up, res;
@@ -751,8 +761,47 @@
 						me.addModel(decorator(math));
 					}
 				}
+				function searchQuantumBracket() {
+					var i,
+						stq = "init",
+						qch;
+					for(i = 1;; i++) {
+						qch = me.getCellRel(i, 0).getChar();
+						switch(stq) {
+						case "init":
+							if(qch !== '\n' && !printableRE.test(qch)) {
+								return false;
+							} else if(qch === '|') {
+								stq = "bar";
+							}
+							break;
+						case "bar":
+							if(qch !== '\n' && !printableRE.test(qch)) {
+								return "bra";
+							} else if(qch === '>') {
+								return "ket";
+							}
+							break;
+						}
+					}
+				}
+				function searchQuantumKet() {
+					var i,
+						qch;
+					for(i = 1;; i++) {
+						qch = me.getCellRel(i, 0).getChar();
+						if(qch !== '\n' && !printableRE.test(qch)) {
+							return false;
+						} else if(qch === '>') {
+							return "ket";
+						}
+					}
+				}
 				if(ch === '\n') {
 					markAccent();
+					return me;
+				} else if(boldskip) {
+					boldskip = false;
 					return me;
 				} else if(texcharFn) {
 					if(/[ \*]/.test(ch)) {
@@ -774,32 +823,38 @@
 						builder += ch;
 						return me;
 					}
-				} else if(/[{\(\[]/.test(ch)) {
+				} else if(!quantumBracket && /[{\(\[]/.test(ch)) {
 					beforech = ch === '{' ? '\\{' : ch;
 					builderToChar();
 					me.newModel();
 					return me.clearStringBuilder();
-				} else if(/[}\)\]]/.test(ch)) {
+				} else if(!quantumBracket && /[}\)\]]/.test(ch)) {
 					builderToChar();
 					v1 = me.popModel();
 					me.addModel(new GroupFormula(v1, [beforech, ch === '}' ? '\\}' : ch]));
 					return me.clearStringBuilder();
 				} else if(ch === '|') {
-					builderToChar();
-					if(isbar) {
-						isbar = false;
-						v1 = me.popModel();
-						me.addModel(new GroupFormula(v1, ['|', '|']));
+					if(quantumBracket === "bra") {
+						quantumBracket = false;
+					} else if(opt.useQuantumBracket && searchQuantumKet()) {
+						quantumBracket = "ket";
 					} else {
-						isbar = true;
-						me.newModel();
+						builderToChar();
+						if(isbar) {
+							isbar = false;
+							v1 = me.popModel();
+							me.addModel(new GroupFormula(v1, ['|', '|']));
+						} else {
+							isbar = true;
+							me.newModel();
+						}
+						return me.clearStringBuilder();
 					}
-					return me.clearStringBuilder();
 				} else if(ch === '$') {
 					builderToChar();
 					istex = true;
 					return me.clearStringBuilder();
-				} else if(ch === '@') {
+				} else if(opt.useAtAsRoundD && ch === '@') {
 					return putPrintable('\\partial ');
 				} else if(/[ ]/.test(ch)) {
 					if(matchMathSequence(markAccent)) {
@@ -812,18 +867,33 @@
 					markAccent();
 					return me.clearStringBuilder();
 				} else if(ch === '*') {
+					builderToChar();
 					if(boldmath) {
-						boldmath = false;
-						builderToChar();
 						v1 = me.popModel();
-						decorateMath(v1, function(x) { return decorateBold(x); });
+						decorateMath(v1, boldmath);
+						boldmath = false;
+						return me.clearStringBuilder();
+					} else if(/[\|\/\*]/.test(me.getCellRight().getChar()) &&
+							 !/[ ]/.test(me.getCellRel(2, 0).getChar())) {
+						me.newModel();
+						boldmath = boldFn[me.getCellRight().getChar()];
+						boldskip = true;
 						return me.clearStringBuilder();
 					} else if(!/[ ]/.test(me.getCellRight().getChar())) {
-						builderToChar();
 						me.newModel();
-						boldmath = true;
+						boldmath = decorateBold;
 						return me.clearStringBuilder();
 					}
+				} else if(opt.useQuantumBracket && ch === '<') {
+					builderToChar();
+					quantumBracket = searchQuantumBracket();
+					me.addModel(new Printable('\\langle'));
+					return me.clearStringBuilder();
+				} else if(quantumBracket === "ket" && ch === '>') {
+					builderToChar();
+					quantumBracket = false;
+					me.addModel(new Printable('\\rangle'));
+					return me.clearStringBuilder();
 				}
 				for(i in mathChars) {
 					if(i === ch) {
@@ -1373,7 +1443,7 @@
 						return st.FINIT;
 					}
 				case st.INIT_CHECKROOT:
-					if(cell.getChar() === 'v' ||
+					if(cell.getChar() === 'v' &&
 							/[\/_]/.test(quadro.getCellRel(1, -1).getChar())) {
 						cell.markReturn.push('INIT');
 						quadro.clearStringBuilder();
@@ -3762,11 +3832,12 @@
 		BoldMathJax.prototype.toLaTeX = function() {
 			return "\\boldsymbol{" + this.value.toLaTeX() + "}";
 		};
-		function ScriptFont(value) {
+		function MathDecorate(value, decorator) {
 			this.value = value;
+			this.decorator = decorator;
 		}
-		ScriptFont.prototype.toLaTeX = function() {
-			return "\\mathscr{" + this.value.toLaTeX() + "}";
+		MathDecorate.prototype.toLaTeX = function() {
+			return this.decorator + "{" + this.value.toLaTeX() + "}";
 		};
 
 		var q, p, res = '';
