@@ -56,7 +56,7 @@
 			twoBytesStr += '\u00ac\u00b1\u00d7\u00f7' +
 				'\u2200\u2202\u2203\u2205\u2207-\u2209\u220b\u2212\u2213\u221d-\u2220\u2225-\u222c\u222e' +
 				'\u2234\u2235\u223d\u2243\u2245\u2248\u2252\u2260-\u2262\u2266\u2267\u226a\u226b\u2276\u2277' +
-				'\u2282-\u2287\u228a\u228b\u2295-\u2297\u22a5\u22bf\u22da\u22db\u29bf';
+				'\u2282-\u2287\u228a\u228b\u2295-\u2297\u22a5\u22bf\u22da\u22db\u29bf\uff01-\uff60\uffe0-\uffe6';
 		}
 		decorateBold = function(x) { return new BoldMathJax(x) };
 
@@ -761,12 +761,32 @@
 						me.addModel(decorator(math));
 					}
 				}
+				function searchSuperOrSub(posx, step) {
+					var i,
+						qcell;
+					for(i = step;; i += step) {
+						qcell = me.getCellRel(posx, i);
+						if(qcell.isOutsideY() ||
+								qcell.markMatrixRowSeparator ||
+								qcell.markCasesRowSeparator ||
+								qcell.isTraversed() ||
+								qcell.markTemp ||
+								qcell.markSumBase) {
+							return false;
+						} else if(qcell.isPrintable()) {
+							return true;
+						}
+					}
+				}
 				function searchQuantumBracket() {
 					var i,
 						stq = "init",
 						qch;
 					for(i = 1;; i++) {
 						qch = me.getCellRel(i, 0).getChar();
+						if(qch === ' ' && (searchSuperOrSub(i, -1) || searchSuperOrSub(i, 1))) {
+							continue;
+						}
 						switch(stq) {
 						case "init":
 							if(qch !== '\n' && !printableRE.test(qch)) {
@@ -778,7 +798,8 @@
 						case "bar":
 							if(qch !== '\n' && !printableRE.test(qch)) {
 								return "bra";
-							} else if(qch === '>') {
+							} else if(qch === '>' ||
+									(qch === '\n' && me.getCellRel(i + 1, 0).getChar() === '\uff1e')) {
 								return "ket";
 							}
 							break;
@@ -790,9 +811,13 @@
 						qch;
 					for(i = 1;; i++) {
 						qch = me.getCellRel(i, 0).getChar();
+						if(qch === ' ' && (searchSuperOrSub(i, -1) || searchSuperOrSub(i, 1))) {
+							continue;
+						}
 						if(qch !== '\n' && !printableRE.test(qch)) {
 							return false;
-						} else if(qch === '>') {
+						} else if(qch === '>' ||
+								(qch === '\n' && me.getCellRel(i + 1, 0).getChar() === '\uff1e')) {
 							return "ket";
 						}
 					}
@@ -884,12 +909,14 @@
 						boldmath = decorateBold;
 						return me.clearStringBuilder();
 					}
-				} else if(opt.useQuantumBracket && ch === '<') {
+				} else if(opt.useQuantumBracket &&
+						/[<\uff1c]/.test(ch) &&
+						searchQuantumBracket()) {
 					builderToChar();
 					quantumBracket = searchQuantumBracket();
 					me.addModel(new Printable('\\langle'));
 					return me.clearStringBuilder();
-				} else if(quantumBracket === "ket" && ch === '>') {
+				} else if(quantumBracket === "ket" && /[>\uff1e]/.test(ch)) {
 					builderToChar();
 					quantumBracket = false;
 					me.addModel(new Printable('\\rangle'));
