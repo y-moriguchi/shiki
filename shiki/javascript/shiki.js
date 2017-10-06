@@ -47,7 +47,8 @@
 			opt,
 			printableREStr,
 			printableRE,
-			decorateBold;
+			decorateBold,
+			BITMASK = 1048576;
 		opt = extend(defaultOptions, option);
 		if(opt.greekBytes === 2) {
 			twoBytesStr += '\u0391-\u03A9\u03b1-\u03c1\u03c3-\u03c9';
@@ -1059,7 +1060,7 @@
 					}
 
 					if(opt.debug) {
-						opt.debuglog(trans.getStateName(state % 1000000) + ":" + quadro.get().getChar());
+						opt.debuglog(trans.getStateName(state % BITMASK) + ":" + quadro.get().getChar());
 					}
 
 					if(count++ > opt.iteration) {
@@ -1313,12 +1314,12 @@
 			st.addState("FRET_CMB_3");
 			st.addState("FRET_CMB_4");
 			var NEXT_FSUB = 0,
-				NEXT_ROOT = 1000000,
-				NEXT_FPOW = 2000000,
+				NEXT_ROOT = BITMASK,
+				NEXT_FPOW = BITMASK * 2,
 				nextLabel,
 				nextState;
 			function directSum(state, next) {
-				return next + (Math.floor(state / 1000000) * 1000000);
+				return next + (Math.floor(state / BITMASK) * BITMASK);
 			}
 			function markInt(quadro) {
 				quadro.getCellRel(1,  0).markSumSign = true;
@@ -1392,7 +1393,7 @@
 					t3,
 					t4,
 					i;
-				switch(state % 1000000) {
+				switch(state % BITMASK) {
 				case st.INIT:
 					return st.THISINIT;
 				case st.THISINIT:
@@ -2250,7 +2251,7 @@
 						quadro.moveLeft();
 						return directSum(state, st.FPRINTABLE_DRAWTEMP2);
 					} else {
-						cell.markTemp = true;
+						cell.markTemp = cell.markTemp | state;
 						quadro.moveRight();
 						return state;
 					}
@@ -2258,7 +2259,7 @@
 					if(cell.markRootNum) {
 						return st.FPRINTABLE_RET_LEFT;
 					} else if(cell.isProcessed()) {
-						switch(Math.floor(state / 1000000) * 1000000) {
+						switch(Math.floor(state / BITMASK) * BITMASK) {
 						case NEXT_FSUB:
 							quadro.moveDown().moveRight();
 							return st.FSUB_SCAN;
@@ -2358,6 +2359,9 @@
 						return state;
 					}
 				case st.FPOW_RET_DELTEMP:
+					if(cell.markTemp > NEXT_ROOT) {
+						quadro.moveRight();
+					}
 					return st.FPOW_RET_DELTEMP2;
 				case st.FPOW_RET_DELTEMP2:
 					if(cell.isOutsideX()) {
