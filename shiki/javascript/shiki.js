@@ -21,6 +21,7 @@
 		debuglog: console.log,
 		iteration: 100000,
 		className: "shiki",
+		scriptType: "text/x-shiki",
 		useAtAsRoundD: true,
 		useQuantumBracket: true
 	};
@@ -4023,6 +4024,14 @@
 				}
 				return opt;
 			}
+			function replaceChildNode(node, text) {
+				var result,
+					divNode;
+				result = Shiki.parse(text, opt);
+				divNode = document.createElement("div");
+				divNode.appendChild(document.createTextNode(result));
+				node.parentNode.replaceChild(divNode, node);
+			}
 			opt = readConfig(defaultOptions);
 			if(opt.mathrm) {
 				sp = opt.mathrm.split(/,/);
@@ -4033,14 +4042,34 @@
 				}
 			}
 			document.addEventListener("DOMContentLoaded", function(e) {
-				var dv = document.getElementsByTagName("div"),
-					i,
+				var i,
+					j,
 					cls,
-					script;
-				for(var i = 0; i < dv.length; i++) {
-					cls = dv[i].className.split(/[\x09\x0A\x0C\x0D\x20]+/);
+					text,
+					result,
+					divNodes,
+					cNodes,
+					scriptNodes;
+				divNodes = document.getElementsByTagName("div");
+				for(i = 0; i < divNodes.length; i++) {
+					cls = divNodes[i].className.split(/[\x09\x0A\x0C\x0D\x20]+/);
 					if(cls.indexOf(opt.className) >= 0) {
-						dv[i].firstChild.nodeValue = Shiki.parse(dv[i].firstChild.nodeValue, opt);
+						cNodes = divNodes[i].childNodes;
+						for(j = 0; j < cNodes.length; j++) {
+							if(cNodes[j].nodeType === 8) {
+								replaceChildNode(cNodes[j], cNodes[j].nodeValue);
+							} else if(cNodes[j].nodeType === 3 &&
+									cNodes[j].nodeValue.trim() !== '') {
+								result = Shiki.parse(cNodes[j].nodeValue, opt);
+								cNodes[j].nodeValue = result;
+							}
+						}
+					}
+				}
+				scriptNodes = document.getElementsByTagName("script");
+				for(i = 0; i < scriptNodes.length; i++) {
+					if(scriptNodes[i].type === opt.scriptType) {
+						replaceChildNode(scriptNodes[i], scriptNodes[i].text);
 					}
 				}
 			});
