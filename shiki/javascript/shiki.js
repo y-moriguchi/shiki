@@ -23,7 +23,8 @@
 		className: "shiki",
 		scriptType: "text/x-shiki",
 		useAtAsRoundD: true,
-		useQuantumBracket: true
+		useQuantumBracket: true,
+		useVerticalBarAsDifference: true
 	};
 	function extend(base, extension) {
 		var i, res = {};
@@ -394,7 +395,7 @@
 				builderSub = '',
 				models = [],
 				isbar = false,
-				beforech = false,
+				beforech = [],
 				texcharFn = false,
 				istex = false,
 				boldmath = false,
@@ -847,14 +848,14 @@
 						return me;
 					}
 				} else if(!quantumBracket && /[{\(\[]/.test(ch)) {
-					beforech = ch === '{' ? '\\{' : ch;
+					beforech.push(ch === '{' ? '\\{' : ch);
 					builderToChar();
 					me.newModel();
 					return me.clearStringBuilder();
 				} else if(!quantumBracket && /[}\)\]]/.test(ch)) {
 					builderToChar();
 					v1 = me.popModel();
-					me.addModel(new GroupFormula(v1, [beforech, ch === '}' ? '\\}' : ch]));
+					me.addModel(new GroupFormula(v1, [beforech.pop(), ch === '}' ? '\\}' : ch]));
 					return me.clearStringBuilder();
 				} else if(ch === '|') {
 					if(quantumBracket === "bra") {
@@ -3859,12 +3860,29 @@
 			this.pow = pow;
 		}
 		PowAfterSub.prototype.toLaTeX = function() {
-			if(this.value instanceof Sub) {
+			if(!(this.value instanceof Sub)) {
+				throw 'Internal Error';
+			} else if(opt.useVerticalBarAsDifference &&
+					this.value.value instanceof GroupFormula &&
+					this.value.value.paren[0] === "[" &&
+					this.value.value.paren[1] === "]") {
+				return ("{\\left. " +
+						this.value.value.f1.toLaTeX() +
+						"\\right| _{" + this.value.subs.toLaTeX() + "}" +
+						"^{" + this.pow.toLaTeX() + "}");
+			} else if(opt.useVerticalBarAsDifference &&
+					this.value.value instanceof ConcatFormula &&
+					this.value.value.latter() instanceof GroupFormula &&
+					this.value.value.latter().paren[0] === "[" &&
+					this.value.value.latter().paren[1] === "]") {
+				return (this.value.value.former().toLaTeX() +
+						"{\\left. " + this.value.value.latter().f1.toLaTeX() +
+						"\\right|} _{" + this.value.subs.toLaTeX() + "}" +
+						"^{" + this.pow.toLaTeX() + "}");
+			} else {
 				return (this.value.value.toLaTeX() +
 						"_{" + this.value.subs.toLaTeX() + "}" +
 						"^{" + this.pow.toLaTeX() + "}");
-			} else {
-				throw 'Internal Error';
 			}
 		};
 		function Sub(value, subs) {
