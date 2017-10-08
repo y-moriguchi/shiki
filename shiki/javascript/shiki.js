@@ -227,7 +227,6 @@
 			' !=': '\\neq',
 			' =/=': '\\neq',
 			' _|_': '\\perp',
-			' ->': '\\to',
 			' =>': '\\Rightarrow',
 			' |=': '\\models',
 			' <=>': '\\Leftrightarrow',
@@ -241,6 +240,7 @@
 			' -|': '\\dashv',
 			' ~': '\\sim',
 			' ||': '\\parallel',
+			'->': '\\to',
 			'oo': '\\infty',
 			'...': '\\cdots',
 			'sin': '\\sin',
@@ -265,6 +265,7 @@
 			'ln': '\\ln',
 			'max': '\\max',
 			'min': '\\min',
+			'lim': '\\lim',
 			'grad': '\\mathrm{grad}',
 			'rot': '\\mathrm{rot}',
 			'div': '\\mathrm{div}',
@@ -714,11 +715,14 @@
 					uf,
 					ch = me.get().getChar();
 				function partialIndexOf(str) {
-					var i, pstr;
-					for(i = 0; i < str.length; i++) {
-						pstr = builder.substring(i, str.length - i);
-						if(str.indexOf(pstr) >= 0) {
-							return true;
+					var i,
+						pstr;
+					for(i = 1; i < str.length; i++) {
+						if(builder.indexOf(str) < 0) {
+							pstr = str.substring(0, i);
+							if(builder.indexOf(pstr) >= 0) {
+								return true;
+							}
 						}
 					}
 					return false;
@@ -933,6 +937,9 @@
 					if(partialIndexOf(i)) {
 						return me;
 					}
+				}
+				if(matchMathSequence()) {
+					return me.clearStringBuilder();
 				}
 				builderToChar();
 				return me.clearStringBuilder();
@@ -1590,9 +1597,6 @@
 							cell.markProcessed();
 						}
 						return st.FPRINTABLE_RET;
-					} else if(cell.markRootEnd || cell.markRootWall) {
-						quadro.moveLeft();
-						return st.FPRINTABLE_RET;
 					} else if(cell.markPow) {
 						cell.markPow = false;
 						quadro.moveLeft();
@@ -1602,6 +1606,9 @@
 						quadro.moveLeft();
 						quadro.get().markSub = true;
 						return directSum(NEXT_FSUB, st.FPRINTABLE_DRAWTEMP);
+					} else if(cell.markRootEnd || cell.markRootWall) {
+						quadro.moveLeft();
+						return st.FPRINTABLE_RET;
 					} else if(cell.getChar() === '-') {
 						quadro.moveRight();
 						return st.FPRINTABLE_MINUS;
