@@ -324,6 +324,7 @@
 			me.markMatrixColLine = false;
 			me.markMatrixProcessed = false;
 			me.markMatrixRowLineBase = false;
+			me.markMatrixInit = false;
 			me.markAccent = false;
 			me.markCasesRange = false;
 			me.markCasesStart = false;
@@ -1089,12 +1090,25 @@
 					}
 				}
 			};
+			me.isPrintableRight = function() {
+				var i,
+					cell;
+				for(i = 1;; i++) {
+					cell = getPosRel(i, 0);
+					if(cell.isOutsideX()) {
+						return false;
+					} else if(cell.isPrintable()) {
+						return true;
+					}
+				}
+			};
 			me.operator = false;
 			me.storeMathSign = [];
 			me.matrixType = '';
 			me.matrixElements = false;
 			me.matrixRowCount = false;
 			me.matrixColCount = false;
+			me.matrixMoveInit = false;
 			me.casesElements = false;
 			me.casesCases = false;
 			me.fracRootLabel = false;
@@ -1294,13 +1308,20 @@
 			st.addState("MATRIX_RESCAN_4");
 			st.addState("MATRIX_RESCAN_5");
 			st.addState("MATRIX_END");
-			st.addState("MATRIX_END");
-			st.addState("MATRIX_END");
-			st.addState("MATRIX_END");
-			st.addState("MATRIX_END");
 			st.addState("MATRIX_END_2");
 			st.addState("MATRIX_END_3");
 			st.addState("MATRIX_END_4");
+			st.addState("MATRIX_END_INIT");
+			st.addState("MATRIX_END_INIT_2");
+			st.addState("MATRIX_END_INIT_3");
+			st.addState("MATRIX_END_INIT_4");
+			st.addState("MATRIX_END_INIT_5");
+			st.addState("MATRIX_END_INITBASE");
+			st.addState("MATRIX_END_INITBASE_2");
+			st.addState("MATRIX_END_INITBASE_3");
+			st.addState("MATRIX_END_INITBASE_FOUND_UP");
+			st.addState("MATRIX_END_INITBASE_FOUND_DOWN");
+			st.addState("MATRIX_END_INITBASE_FOUND");
 			st.addState("CASES");
 			st.addState("CASES_RANGE");
 			st.addState("CASES_RANGE_DOWN");
@@ -3080,7 +3101,7 @@
 					if(cell.markMatrixStart) {
 						cell.markProcessed();
 						quadro.moveRight();
-						return st.MATRIX_END_4;
+						return cell.markReturn[0] === 'INIT' ? st.MATRIX_END_INIT : st.MATRIX_END_4;
 					} else {
 						quadro.moveDown();
 						return state;
@@ -3092,6 +3113,109 @@
 						quadro.addModel(new Matrix(quadro.matrixElements, quadro.matrixType));
 						return st.FPRINTABLE;
 					} else {
+						return state;
+					}
+				case st.MATRIX_END_INIT:
+					if(cell.markMatrixRange) {
+						return st.MATRIX_END_INIT_2;
+					} else {
+						quadro.moveRight();
+						return state;
+					}
+				case st.MATRIX_END_INIT_2:
+					if(cell.markMatrixRange) {
+						quadro.moveUp();
+						return state;
+					} else {
+						quadro.moveDown();
+						return st.MATRIX_END_INIT_3;
+					}
+				case st.MATRIX_END_INIT_3:
+					if(quadro.isPrintableRight()) {
+						quadro.moveLeft();
+						return st.MATRIX_END_INITBASE;
+					} else if(cell.markMatrixRange) {
+						quadro.moveDown();
+						return state;
+					} else {
+						quadro.moveUp();
+						return st.MATRIX_END_INIT_4;
+					}
+				case st.MATRIX_END_INIT_4:
+					if(cell.markMatrixRange) {
+						quadro.moveLeft();
+						return state;
+					} else {
+						quadro.moveRight();
+						return st.MATRIX_END_INIT_5;
+					}
+				case st.MATRIX_END_INIT_5:
+					if(cell.markReturn[0] === 'INIT') {
+						cell.markProcessed();
+						quadro.moveRight();
+						return st.MATRIX_END_INITBASE_FOUND;
+					} else {
+						quadro.moveUp();
+						return state;
+					}
+				case st.MATRIX_END_INITBASE:
+					if(cell.markMatrixRange) {
+						cell.markMatrixInit = true;
+						return st.MATRIX_END_INITBASE_2;
+					} else {
+						quadro.moveLeft();
+						return state;
+					}
+				case st.MATRIX_END_INITBASE_2:
+					if(cell.markReturn[0] === 'INIT') {
+						quadro.matrixMoveInit = cell.markReturn;
+						cell.markReturn = [];
+						return st.MATRIX_END_INITBASE_FOUND_UP;
+					} else if(cell.markMatrixRange) {
+						quadro.moveUp();
+						return state;
+					} else {
+						quadro.moveDown();
+						return st.MATRIX_END_INITBASE_3;
+					}
+				case st.MATRIX_END_INITBASE_3:
+					if(cell.markReturn[0] === 'INIT') {
+						quadro.matrixMoveInit = cell.markReturn;
+						cell.markReturn = [];
+						return st.MATRIX_END_INITBASE_FOUND_DOWN;
+					} else if(cell.markMatrixRange) {
+						quadro.moveDown();
+						return state;
+					} else {
+						throw 'Internal Error';
+					}
+				case st.MATRIX_END_INITBASE_FOUND_UP:
+					if(cell.markMatrixInit) {
+						cell.markReturn.unshift.apply(cell.markReturn, quadro.matrixMoveInit);
+						cell.markProcessed();
+						quadro.moveRight();
+						return st.MATRIX_END_INITBASE_FOUND;
+					} else {
+						quadro.moveDown();
+						return state;
+					}
+				case st.MATRIX_END_INITBASE_FOUND_DOWN:
+					if(cell.markMatrixInit) {
+						cell.markReturn.unshift.apply(cell.markReturn, quadro.matrixMoveInit);
+						cell.markProcessed();
+						quadro.moveRight();
+						return st.MATRIX_END_INITBASE_FOUND;
+					} else {
+						quadro.moveUp();
+						return state;
+					}
+				case st.MATRIX_END_INITBASE_FOUND:
+					cell.markProcessed();
+					if(cell.markMatrixRange) {
+						quadro.addModel(new Matrix(quadro.matrixElements, quadro.matrixType));
+						return st.FPRINTABLE;
+					} else {
+						quadro.moveRight();
 						return state;
 					}
 				case st.CASES:
