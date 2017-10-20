@@ -230,8 +230,8 @@
 			' =>': '\\Rightarrow',
 			' |=': '\\models',
 			' <=>': '\\Leftrightarrow',
-			' <': '\\le',
-			' >': '\\ge',
+			' <': '\\lt',
+			' >': '\\gt',
 			' <=': '\\leq',
 			' >=': '\\geq',
 			' >>': '\\ll',
@@ -333,6 +333,8 @@
 			me.markCmbFound = false;
 			me.markCmbBoundary = false;
 			me.markMinusTemp = false;
+			me.markParenTemp = false;
+			me.markMiddleBar = false;
 			me.isOutsideX = function() {
 				return ch === -1;
 			};
@@ -399,6 +401,7 @@
 				beforech = [],
 				texcharFn = false,
 				istex = false,
+				isquote = false,
 				boldmath = false,
 				boldskip = false,
 				boldFn,
@@ -711,6 +714,8 @@
 			me.appendBuilder = function() {
 				var i,
 					v1,
+					v2,
+					grp,
 					a,
 					uf,
 					ch = me.get().getChar();
@@ -852,20 +857,32 @@
 						return me;
 					}
 				} else if(!quantumBracket && /[{\(\[]/.test(ch)) {
-					beforech.push(ch === '{' ? '\\{' : ch);
+					beforech.push([ch === '{' ? '\\{' : ch]);
 					builderToChar();
 					me.newModel();
 					return me.clearStringBuilder();
 				} else if(!quantumBracket && /[}\)\]]/.test(ch)) {
 					builderToChar();
 					v1 = me.popModel();
-					me.addModel(new GroupFormula(v1, [beforech.pop(), ch === '}' ? '\\}' : ch]));
+					grp = beforech.pop();
+					grp.push(ch === '}' ? '\\}' : ch);
+					if(grp.length < 3) {
+						me.addModel(new GroupFormula(v1, grp));
+					} else {
+						v2 = me.popModel();
+						me.addModel(new GroupFormula(v2, v1, grp));
+					}
 					return me.clearStringBuilder();
 				} else if(ch === '|') {
 					if(quantumBracket === "bra") {
 						quantumBracket = false;
 					} else if(opt.useQuantumBracket && searchQuantumKet()) {
 						quantumBracket = "ket";
+					} else if(me.get().markMiddleBar) {
+						me.get().markMiddleBar = false;
+						builderToChar();
+						me.addModel(new Printable('\\mid'));
+						return me.clearStringBuilder();
 					} else {
 						builderToChar();
 						if(isbar) {
@@ -910,6 +927,17 @@
 					} else if(!/[ ]/.test(me.getCellRight().getChar())) {
 						me.newModel();
 						boldmath = decorateBold;
+						return me.clearStringBuilder();
+					}
+				} else if(ch === '`') {
+					isquote = !isquote;
+					if(isquote) {
+						builderToChar();
+						me.clearStringBuilder();
+						builder += ' ';
+						return me;
+					} else {
+						me.addModel(new Printable('\\text{' + builder + '}'));
 						return me.clearStringBuilder();
 					}
 				} else if(opt.useQuantumBracket &&
@@ -1114,6 +1142,8 @@
 			me.fracRootLabel = false;
 			me.fracRootGoto = false;
 			me.fracRootAction = false;
+			me.parenStack = false;
+			me.barCount = false;
 			return me;
 		}
 		function parseEngine(quadro, trans) {
@@ -1246,6 +1276,10 @@
 			st.addState("FPRINTABLE_SUM_NOUP");
 			st.addState("FPRINTABLE_BAR");
 			st.addState("FPRINTABLE_LT");
+			st.addState("FPRINTABLE_PAREN");
+			st.addState("FPRINTABLE_PAREN_2");
+			st.addState("FPRINTABLE_PAREN_3");
+			st.addState("FPRINTABLE_PAREN_4");
 			st.addState("FPRINTABLE_RET");
 			st.addState("FPRINTABLE_RET_2");
 			st.addState("FPRINTABLE_RET_3");
@@ -1695,6 +1729,11 @@
 						return st.FPRINTABLE_BAR;
 					} else if(cell.getChar() === '<') {
 						return st.FPRINTABLE_LT;
+					} else if(/[{\[\(]/.test(cell.getChar())) {
+						quadro.parenStack = [cell.getChar()];
+						cell.markParenTemp = true;
+						quadro.moveRight();
+						return st.FPRINTABLE_PAREN;
 					} else if(quadro.isVdots()) {
 						quadro.addModel(new Printable("\\vdots"));
 						quadro.getCellRel(0, 0).markProcessed();
@@ -1752,18 +1791,6 @@
 						return st.FPRINTABLE_RET;
 					} else if(!!(nxt = getSumIntState(quadro))) {
 						return nxt;
-					} else if(cell.getChar() === '|') {
-						quadro.moveLeft();
-						quadro.appendBuilder();
-						quadro.get().markProcessed();
-						quadro.moveRight();
-						return st.FPRINTABLE_BAR;
-					} else if(cell.getChar() === '<') {
-						quadro.moveLeft();
-						quadro.appendBuilder();
-						quadro.get().markProcessed();
-						quadro.moveRight();
-						return st.FPRINTABLE_LT;
 					} else if(cell.isPrintable()) {
 						quadro.moveLeft();
 						quadro.appendBuilder();
@@ -2327,6 +2354,59 @@
 						quadro.moveRight();
 						return st.FPRINTABLE;
 					}
+				case st.FPRINTABLE_PAREN:
+					if(/[{\[\(]/.test(cell.getChar())) {
+						quadro.parenStack.push(cell.getChar());
+						quadro.moveRight();
+						return state;
+					} else if(/[}\]\)]/.test(cell.getChar())) {
+						quadro.parenStack.pop();
+						if(quadro.parenStack.length > 0) {
+							quadro.moveRight();
+							return state
+						} else {
+							quadro.barCount = 0;
+							quadro.moveLeft();
+							return st.FPRINTABLE_PAREN_2;
+						}
+					} else {
+						quadro.moveRight();
+						return state;
+					}
+				case st.FPRINTABLE_PAREN_2:
+					if(cell.markParenTemp) {
+						cell.markParenTemp = false;
+						quadro.parenStack = false;
+						quadro.barCount = false;
+						quadro.appendBuilder();
+						cell.markProcessed();
+						quadro.moveRight();
+						return st.FPRINTABLE;
+					} else if(cell.getChar() !== '|') {
+						quadro.moveLeft();
+						return state;
+					} else if(quadro.barCount === 0) {
+						cell.markMiddleBar = true;
+						quadro.barCount = 1;
+						quadro.moveLeft();
+						return state;
+					} else {
+						quadro.moveRight();
+						return st.FPRINTABLE_PAREN_3;
+					}
+				case st.FPRINTABLE_PAREN_3:
+					if(cell.getChar() === '|') {
+						cell.markMiddleBar = false;
+						quadro.barCount = 0;
+						quadro.moveLeft();
+						return st.FPRINTABLE_PAREN_4;
+					} else {
+						quadro.moveRight();
+						return state;
+					}
+				case st.FPRINTABLE_PAREN_4:
+					quadro.moveLeft();
+					return cell.getChar() === '|' ? st.FPRINTABLE_PAREN_2 : state;
 				case st.FPRINTABLE_RET:
 					if(cell.isOutsideX()) {
 						quadro.moveLeft();
@@ -4070,14 +4150,26 @@
 				return arr;
 			}
 		};
-		function GroupFormula(f1, paren) {
-			this.f1 = f1;
-			this.paren = paren;
+		function GroupFormula(f1, f2OrParen, paren) {
+			if(paren === void(0)) {
+				this.f1 = f1;
+				this.f2 = null;
+				this.paren = f2OrParen;
+			} else {
+				this.f1 = f1;
+				this.f2 = f2OrParen;
+				this.paren = paren;
+			}
 		}
 		GroupFormula.prototype.toLaTeX = function() {
-			return ("{\\left" + this.paren[0] + " " +
-					this.f1.toLaTeX() +
-					"\\right" + this.paren[1] + "}");
+			if(this.f2) {
+				return ("{\\left" + this.paren[0] + " " + this.f1.toLaTeX() +
+						"\\middle" + this.paren[1] + " " + this.f2.toLaTeX() +
+						"\\right" + this.paren[2] + "}");
+			} else {
+				return ("{\\left" + this.paren[0] + " " + this.f1.toLaTeX() +
+						"\\right" + this.paren[1] + "}");
+			}
 		};
 		function Fraction(numerator, denominator) {
 			this.numerator = numerator;
