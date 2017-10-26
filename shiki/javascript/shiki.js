@@ -301,7 +301,7 @@
 			me.markFraction = false;
 			me.markRoot = false;
 			me.markRootNum = false;
-			me.markRootEnd = false;
+			me.markRootEnd = 0;
 			me.markRootWall = false;
 			me.markRootBase = false;
 			me.markPow = false;
@@ -366,6 +366,9 @@
 						me.isTraversed() ||
 						me.markTemp ||
 						me.markSumBase);
+			};
+			me.isRootEnd = function() {
+				return me.markRootEnd || me.markRootWall;
 			};
 			return me;
 		}
@@ -1088,7 +1091,7 @@
 					if(cell.isOutsideY()) {
 						return;
 					} else if(cell.markRootEnd) {
-						cell.markRootEnd = false;
+						cell.markRootEnd--;
 						return;
 					}
 				}
@@ -1716,8 +1719,17 @@
 						quadro.moveLeft();
 						quadro.get().markSub = true;
 						return directSum(NEXT_FSUB, st.FPRINTABLE_DRAWTEMP);
-					} else if(cell.markRootEnd || cell.markRootWall) {
-						quadro.moveLeft();
+					} else if(cell.isRootEnd()) {
+						if(cell.getChar() === '-') {
+							cell.markMinusTemp = true;
+							quadro.moveUp();
+							return st.FPRINTABLE_MINUS_2;
+						} else if(cell.isPrintable()) {
+							quadro.appendBuilder();
+							cell.markProcessed();
+						} else {
+							quadro.moveLeft();
+						}
 						return st.FPRINTABLE_RET;
 					} else if(cell.getChar() === '-') {
 						quadro.moveRight();
@@ -1786,7 +1798,7 @@
 							cell.markCmbBoundary) {
 						quadro.moveLeft().moveLeft();
 						return st.FPRINTABLE_RET;
-					} else if(cell.markRootEnd || cell.markRootWall) {
+					} else if(cell.isRootEnd()) {
 						quadro.moveLeft().moveLeft();
 						return st.FPRINTABLE_RET;
 					} else if(!!(nxt = getSumIntState(quadro))) {
@@ -2744,7 +2756,7 @@
 					}
 				case st.ROOT_CEIL4:
 					if(cell.markTemp) {
-						cell.markRootEnd = true;
+						cell.markRootEnd++;
 						return st.ROOT_CEIL5;
 					} else {
 						quadro.moveLeft();
