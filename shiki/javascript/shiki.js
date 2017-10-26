@@ -314,6 +314,7 @@
 			me.markSumSign = false;
 			me.markSumBase = false;
 			me.markSumRight = false;
+			me.markIgnoreSubPow = false;
 			me.markIntTempStart = false;
 			me.markSumMathSign = '';
 			me.markReturn = [];
@@ -1710,6 +1711,9 @@
 							cell.markProcessed();
 						}
 						return st.FPRINTABLE_RET;
+					} else if(cell.markIgnoreSubPow) {
+						cell.markIgnoreSubPow = false;
+						return st.FPRINTABLE_RET;
 					} else if(cell.markPow) {
 						cell.markPow = false;
 						quadro.moveLeft();
@@ -1727,10 +1731,11 @@
 						} else if(cell.isPrintable()) {
 							quadro.appendBuilder();
 							cell.markProcessed();
+							return st.FPRINTABLE_RET;
 						} else {
 							quadro.moveLeft();
+							return st.FPRINTABLE_RET;
 						}
-						return st.FPRINTABLE_RET;
 					} else if(cell.getChar() === '-') {
 						quadro.moveRight();
 						return st.FPRINTABLE_MINUS;
@@ -2464,7 +2469,7 @@
 						return state;
 					}
 				case st.FPRINTABLE_DRAWTEMP2:
-					if(cell.markRootNum) {
+					if(cell.markRootNum || cell.markIgnoreSubPow) {
 						return st.FPRINTABLE_RET_LEFT;
 					} else if(cell.isProcessed()) {
 						switch(Math.floor(state / BITMASK) * BITMASK) {
@@ -3750,12 +3755,15 @@
 						return state;
 					}
 				case st.FRET_SUB_DRAWPROC4:
-					if(cell.isProcessed()) {
-						quadro.moveRight().get().markPow = true;
-						return st.FPRINTABLE;
-					} else {
+					if(!cell.isProcessed()) {
 						quadro.moveLeft();
 						return state;
+					} else if(quadro.isMarkRootEndBelow()) {
+						cell.markIgnoreSubPow = true;
+						return st.FPRINTABLE_RET;
+					} else {
+						quadro.moveRight().get().markPow = true;
+						return st.FPRINTABLE;
 					}
 				case st.FRET_POW_RIGHT:
 					if(cell.isProcessed()) {
@@ -3805,15 +3813,18 @@
 						return state;
 					}
 				case st.FRET_POW_DRAWPROC4:
-					if(cell.isProcessed()) {
+					if(!cell.isProcessed()) {
+						quadro.moveLeft();
+						return state;
+					} else if(quadro.isMarkRootEndBelow()) {
+						cell.markIgnoreSubPow = true;
+						return st.FPRINTABLE_RET;
+					} else {
 						quadro.moveRight();
 						if(quadro.get().isWhitespace()) {
 							quadro.get().markSub = true;
 						}
 						return st.FPRINTABLE;
-					} else {
-						quadro.moveLeft();
-						return state;
 					}
 				case st.FRET_FRAC1_1:
 					if(cell.getChar() === '-' && cell.isProcessed()) {
