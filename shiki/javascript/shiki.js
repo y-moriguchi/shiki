@@ -914,19 +914,21 @@
 					markAccent();
 					return me.clearStringBuilder();
 				} else if(ch === '*') {
-					builderToChar();
 					if(boldmath) {
+						builderToChar();
 						v1 = me.popModel();
 						decorateMath(v1, boldmath);
 						boldmath = false;
 						return me.clearStringBuilder();
 					} else if(/[\|\/\*]/.test(me.getCellRight().getChar()) &&
 							 !/[ ]/.test(me.getCellRel(2, 0).getChar())) {
+						builderToChar();
 						me.newModel();
 						boldmath = boldFn[me.getCellRight().getChar()];
 						boldskip = true;
 						return me.clearStringBuilder();
 					} else if(!/[ ]/.test(me.getCellRight().getChar())) {
+						builderToChar();
 						me.newModel();
 						boldmath = decorateBold;
 						return me.clearStringBuilder();
