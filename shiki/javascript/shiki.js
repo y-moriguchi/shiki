@@ -475,12 +475,10 @@
 			function isIntAscii(yoffset, center) {
 				return (getPosRelChar(0,  0 + yoffset) === ' ' &&
 						getPosRelChar(1,  0 + yoffset) === center &&
-						getPosRelChar(0, -1 + yoffset) === ' ' &&
 						getPosRelChar(1, -1 + yoffset) === '/' &&
 						getPosRelChar(2, -1 + yoffset) === '\\' &&
 						getPosRelChar(0,  1 + yoffset) === '\\' &&
 						getPosRelChar(1,  1 + yoffset) === '/' &&
-						getPosRelChar(2,  1 + yoffset) === ' '&&
 						!getPosRel(1,  0 + yoffset).markSumSign &&
 						!getPosRel(1, -1 + yoffset).markSumSign &&
 						!getPosRel(2, -1 + yoffset).markSumSign &&
@@ -1533,7 +1531,7 @@
 					} else if(/[\|\-\/]/.test(cell.getChar())) {
 						quadro.moveDown();
 						return st.INIT_CHECKARRAY;
-					} else if(cell.getChar() === '.' && cell.getCellDownChar() === '.') {
+					} else if(cell.getChar() === '.' && quadro.getCellDown().getChar() === '.') {
 						cell.markReturn.push('INIT');
 						quadro.clearStringBuilder();
 						return st.FINIT;
@@ -2168,7 +2166,10 @@
 				case st.FPRINTABLE_INT_ASCII_2:
 					if(quadro.isIntAscii()) {
 						markInt(quadro);
-						quadro.moveRight().moveRight().moveRight();
+						quadro.moveRight().moveRight();
+						if(!quadro.isIntAscii()) {
+							quadro.moveRight();
+						}
 						v1 = quadro.storeMathSign.pop();
 						quadro.storeMathSign.push(v1 + 1);
 						return state;
