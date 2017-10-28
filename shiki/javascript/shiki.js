@@ -636,6 +636,7 @@
 				}
 				if(maxi) {
 					builderToChar(maxa);
+					builder = builder.substring(maxi.length, builder.length);
 					me.addModel(new Printable(mathSequence[maxi] + ' '));
 					if(func) {
 						func();
@@ -1024,7 +1025,8 @@
 				if(texcharFn) {
 					me.addModel(new Printable(texcharFn('\\' + builder)));
 					texcharFn = false;
-				} else if(!matchMathSequence()) {
+				} else {
+					while(matchMathSequence()) {}
 					builderToChar();
 				}
 				return me.clearStringBuilder();
