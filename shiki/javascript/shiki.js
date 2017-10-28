@@ -160,6 +160,7 @@
 			'ψ': '\\psi',
 			'Ω': '\\Omega',
 			'ω': '\\omega',
+			'°': '^\\circ',
 			'\u00ac': '\\lnot',
 			'\u00b1': '\\pm',
 			'\u00d7': '\\times',
@@ -190,7 +191,7 @@
 			'\u2243': '\\simeq',
 			'\u2245': '\\cong',
 			'\u2248': '\\approx',
-			'\u2252': '\\doteq',
+			'\u2252': '\\simeq',
 			'\u2260': '\\neq',
 			'\u2261': '\\equiv',
 			'\u2262': '\\not\\equiv',
@@ -222,24 +223,24 @@
 		var mathSequence = {
 			' *': '\\times',
 			' .': '\\cdot',
-			' +-': '\\pm',
-			' -+': '\\mp',
-			' !=': '\\neq',
-			' =/=': '\\neq',
-			' _|_': '\\perp',
-			' =>': '\\Rightarrow',
-			' |=': '\\models',
-			' <=>': '\\Leftrightarrow',
-			' <': '\\lt',
-			' >': '\\gt',
-			' <=': '\\leq',
-			' >=': '\\geq',
-			' >>': '\\ll',
-			' <<': '\\gg',
+			'+-': '\\pm',
+			'-+': '\\mp',
+			'!=': '\\neq',
+			'=/=': '\\neq',
+			'_|_': '\\perp',
+			'=>': '\\Rightarrow',
+			'|=': '\\models',
+			'<=>': '\\Leftrightarrow',
+			'<': '\\lt',
+			'>': '\\gt',
+			'<=': '\\leq',
+			'>=': '\\geq',
+			'>>': '\\ll',
+			'<<': '\\gg',
 			' |-': '\\vdash',
 			' -|': '\\dashv',
-			' ~': '\\sim',
-			' ||': '\\parallel',
+			'~': '\\sim',
+			'||': '\\parallel',
 			'->': '\\to',
 			'oo': '\\infty',
 			'...': '\\cdots',
@@ -576,6 +577,44 @@
 						getPosRelChar(2, 1) === ' ' &&
 						getPosRelChar(2, 2) === '.');
 			}
+			function isPerp() {
+				return (getPosRelChar(-1, 0) === '_' &&
+						getPosRelChar( 0, 0) === '|' &&
+						getPosRelChar( 1, 0) === '_');
+						
+			}
+			function isModels() {
+				return (getPosRelChar( 0, 0) === '|' &&
+						getPosRelChar( 1, 0) === '=');
+			}
+			function isVdash() {
+				return (getPosRelChar(-1, 0) === ' ' &&
+						getPosRelChar( 0, 0) === '|' &&
+						getPosRelChar( 1, 0) === '-' &&
+						getPosRelChar( 2, 0) === ' ');
+			}
+			function isDashv() {
+				return (getPosRelChar(-2, 0) === ' ' &&
+						getPosRelChar(-1, 0) === '-' &&
+						getPosRelChar( 0, 0) === '|' &&
+						getPosRelChar( 1, 0) === ' ');
+			}
+			function isParallel1() {
+				return (getPosRelChar( 0, 0) === '|' &&
+						getPosRelChar( 1, 0) === '|');
+			}
+			function isParallel2() {
+				return (getPosRelChar(-1, 0) === '|' &&
+						getPosRelChar( 0, 0) === '|');
+			}
+			function isOperatorWithBar() {
+				return (isPerp() ||
+						isModels() ||
+						isVdash() ||
+						isDashv() ||
+						isParallel1() ||
+						isParallel2());
+			}
 			function builderToChar(len) {
 				var j, l, up;
 				l = len === void(0) ? builder.length : len;
@@ -833,8 +872,11 @@
 					}
 				}
 				if(ch === '\n') {
+					if(!matchMathSequence()) {
+						builderToChar();
+					}
 					markAccent();
-					return me;
+					return me.clearStringBuilder();
 				} else if(boldskip) {
 					boldskip = false;
 					return me;
@@ -860,7 +902,9 @@
 					}
 				} else if(!quantumBracket && /[{\(\[]/.test(ch)) {
 					beforech.push([ch === '{' ? '\\{' : ch]);
-					builderToChar();
+					if(!matchMathSequence()) {
+						builderToChar();
+					}
 					me.newModel();
 					return me.clearStringBuilder();
 				} else if(!quantumBracket && /[}\)\]]/.test(ch)) {
@@ -875,7 +919,7 @@
 						me.addModel(new GroupFormula(v2, v1, grp));
 					}
 					return me.clearStringBuilder();
-				} else if(ch === '|') {
+				} else if(ch === '|' && !isOperatorWithBar()) {
 					if(quantumBracket === "bra") {
 						quantumBracket = false;
 					} else if(opt.useQuantumBracket && searchQuantumKet()) {
@@ -1528,6 +1572,10 @@
 					} else if(quadro.isSumInt(1)) {
 						quadro.moveDownIfNotMulti();
 						quadro.get().markReturn.push('INIT');
+						quadro.clearStringBuilder();
+						return st.FINIT;
+					} else if(cell.getChar() === '-' && quadro.getCellRight().getChar() === '-') {
+						cell.markReturn.push('INIT');
 						quadro.clearStringBuilder();
 						return st.FINIT;
 					} else if(/[\|\-\/]/.test(cell.getChar())) {
