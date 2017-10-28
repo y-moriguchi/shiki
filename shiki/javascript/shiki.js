@@ -1779,6 +1779,7 @@
 						} else if(cell.isPrintable()) {
 							quadro.appendBuilder();
 							cell.markProcessed();
+							cell.markIgnoreSubPow = true;
 							return st.FPRINTABLE_RET;
 						} else {
 							quadro.moveLeft();
@@ -1852,7 +1853,21 @@
 						quadro.moveLeft().moveLeft();
 						return st.FPRINTABLE_RET;
 					} else if(cell.isRootEnd()) {
-						quadro.moveLeft().moveLeft();
+						if(cell.getChar() === '-') {
+							cell.markMinusTemp = true;
+							quadro.moveLeft().moveUp();
+							return st.FPRINTABLE_MINUS_2;
+						} else if(cell.isPrintable()) {
+							quadro.moveLeft();
+							quadro.appendBuilder();
+							quadro.get().markProcessed();
+							quadro.moveRight();
+							return st.FPRINTABLE;
+						} else {
+							quadro.moveLeft().moveLeft();
+							return st.FPRINTABLE_RET;
+						}
+						quadro.moveLeft();
 						return st.FPRINTABLE_RET;
 					} else if(!!(nxt = getSumIntState(quadro))) {
 						return nxt;
