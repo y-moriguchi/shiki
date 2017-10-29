@@ -44,6 +44,7 @@
 		var me,
 			OUTSIDEX,
 			OUTSIDEY,
+			OUTSIDEXY,
 			twoBytesStr = '',
 			TWOBYTES,
 			opt,
@@ -340,10 +341,10 @@
 			me.markParenTemp = false;
 			me.markMiddleBar = false;
 			me.isOutsideX = function() {
-				return ch === -1;
+				return ch === -1 || ch === -3;
 			};
 			me.isOutsideY = function() {
-				return ch === -2;
+				return ch === -2 || ch === -3;
 			};
 			me.isPrintable = function() {
 				if(ch < 0) {
@@ -378,6 +379,7 @@
 		}
 		OUTSIDEX = cell(-1);
 		OUTSIDEY = cell(-2);
+		OUTSIDEXY = cell(-3);
 		function isTwoBytes(ch) {
 			return TWOBYTES.test(ch);
 		}
@@ -440,7 +442,7 @@
 			}
 			function getPos(x, y) {
 				if(y < 0 || y >= ilist.length) {
-					return OUTSIDEY;
+					return x < 0 || x >= xMax ? OUTSIDEXY : OUTSIDEY;
 				} else if(x < 0 || x >= xMax) {
 					return OUTSIDEX;
 				} else {
@@ -1144,6 +1146,21 @@
 					}
 				}
 			};
+			me.moveReturnStackHere = function(wallDistance) {
+				var wall = wallDistance ? wallDistance : 0,
+					i,
+					cell;
+				for(i = 0;; i++) {
+					cell = getPosRel(-i - wall, i);
+					if(cell.markReturn.length > 0) {
+						me.get().markReturn.unshift.apply(me.get().markReturn, cell.markReturn);
+						cell.markReturn = [];
+						return;
+					} else if(cell.isOutsideX() || cell.isOutsideY()) {
+						throw 'Internal Error';
+					}
+				}
+			};
 			me.moveReturnStack = function() {
 				var wall,
 					i,
@@ -1158,16 +1175,7 @@
 						throw 'Internal Error';
 					}
 				}
-				for(i = 0;; i++) {
-					cell = getPosRel(-i - wall, i);
-					if(cell.markReturn.length > 0) {
-						me.get().markReturn.unshift.apply(me.get().markReturn, cell.markReturn);
-						cell.markReturn = [];
-						return;
-					} else if(cell.isOutsideX() || cell.isOutsideY()) {
-						throw 'Internal Error';
-					}
-				}
+				me.moveReturnStackHere(wall);
 			};
 			me.isPrintableRight = function() {
 				var i,
@@ -1177,6 +1185,18 @@
 					if(cell.isOutsideX()) {
 						return false;
 					} else if(cell.isPrintable()) {
+						return true;
+					}
+				}
+			};
+			me.isMarkStartRoot = function() {
+				var i,
+					cell;
+				for(i = 1;; i++) {
+					cell = getPosRel(-i, i);
+					if(!/[\/v]/.test(cell.getChar())) {
+						return false;
+					} else if(cell.isMarkStart()) {
 						return true;
 					}
 				}
@@ -2509,27 +2529,31 @@
 						return state;
 					}
 				case st.FPRINTABLE_RET_2:
-					if(!cell.isMarkStart()) {
-						quadro.moveLeft();
-						if(cell.markSubPowProcessed) {
-							return state;
-						} else {
-							return st.FPRINTABLE_RET_3;
-						}
-					} else {
+					if(cell.isMarkStart()) {
 						return st.FRET;
+					} else if(quadro.isMarkStartRoot()) {
+						quadro.moveReturnStackHere();
+						return st.FRET;
+					} else {
+						quadro.moveLeft();
+						return cell.markSubPowProcessed ? state : st.FPRINTABLE_RET_3;
 					}
 				case st.FPRINTABLE_RET_3:
-					if(!cell.isMarkStart()) {
-						quadro.moveLeft();
-						return state;
-					} else {
+					if(cell.isMarkStart() || quadro.isMarkStartRoot()) {
+						if(quadro.isMarkStartRoot()) {
+							quadro.moveReturnStackHere();
+						}
 						quadro.flushBuilder();
 						if(quadro.isModelNotScan()) {
 							return st.FRET;
 						} else {
 							return st.FPRINTABLE_DRAWTEMP;
 						}
+					} else if(quadro.isMarkStartRoot()) {
+						throw 'aaaaaaa';
+					} else {
+						quadro.moveLeft();
+						return state;
 					}
 				case st.FPRINTABLE_DRAWTEMP:
 					if(cell.markRootNum || cell.markRootWall) {
@@ -2845,7 +2869,10 @@
 					if(!cell.markRoot) {
 						quadro.moveLeft();
 						return state;
-					} else if(cell.markReturn[0] === 'INIT') {
+					} else if(cell.markReturn[0] === 'INIT' ||
+							cell.markReturn[cell.markReturn.length - 1] === 'FRAC1' ||
+							cell.markReturn[cell.markReturn.length - 1] === 'FRAC2' ||
+							cell.markReturn[cell.markReturn.length - 1] === 'ROOTBASE') {
 						return st.ROOT_CEIL6_INIT;
 					} else {
 						return st.ROOT_CEIL6_F;
@@ -3615,12 +3642,6 @@
 						quadro.addModel(new Root(v1, v2));
 						quadro.clearStringBuilder();
 						return st.FRET_ROOT_BASE;
-					case 'ROOT':
-						v2 = quadro.popModel();
-						v1 = quadro.popModel();
-						quadro.addModel(new Root(v1, v2));
-						quadro.clearStringBuilder();
-						return st.FRET_ROOT_DOWN;
 					case 'ROOT_N':
 						return st.FRET_ROOT_NUM;
 					case 'SUM_UP':
@@ -4519,9 +4540,11 @@
 					}
 				}
 				scriptNodes = document.getElementsByTagName("script");
-				for(i = 0; i < scriptNodes.length; i++) {
+				for(i = 0; i < scriptNodes.length;) {
 					if(scriptNodes[i].type === opt.scriptType) {
 						replaceChildNode(scriptNodes[i], scriptNodes[i].text);
+					} else {
+						i++;
 					}
 				}
 			});
