@@ -161,6 +161,8 @@
 			'Ω': '\\Omega',
 			'ω': '\\omega',
 			'°': '^\\circ',
+			'△': '\\triangle',
+			'□': '\\Box',
 			'\u00ac': '\\lnot',
 			'\u00b1': '\\pm',
 			'\u00d7': '\\times',
@@ -267,15 +269,15 @@
 			'max': '\\max',
 			'min': '\\min',
 			'lim': '\\lim',
-			'grad': '\\mathrm{grad}',
-			'rot': '\\mathrm{rot}',
-			'div': '\\mathrm{div}',
-			'Tr': '\\mathrm{Tr}',
-			'det': '\\mathrm{det}',
-			'sinc': '\\mathrm{sinc}',
-			'if': '\\mathrm{if}',
-			'iff': '\\mathrm{iff}',
-			'otherwise': '\\mathrm{otherwise}'
+			'grad': '\\mathrm{grad}\\,',
+			'rot': '\\mathrm{rot}\\,',
+			'div': '\\mathrm{div}\\,',
+			'Tr': '\\mathrm{Tr}\\,',
+			'det': '\\mathrm{det}\\,',
+			'sinc': '\\mathrm{sinc}\\,',
+			'if': '\\mathrm{if}\\ ',
+			'iff': '\\mathrm{iff}\\ ',
+			'otherwise': '\\mathrm{otherwise}\\ '
 		};
 
 		me = {};
@@ -636,7 +638,7 @@
 				}
 				if(maxi) {
 					builderToChar(maxa);
-					builder = builder.substring(maxi.length, builder.length);
+					builder = builder.substring(maxi.length + maxa, builder.length);
 					me.addModel(new Printable(mathSequence[maxi] + ' '));
 					if(func) {
 						func();
@@ -873,9 +875,8 @@
 					}
 				}
 				if(ch === '\n') {
-					if(!matchMathSequence()) {
-						builderToChar();
-					}
+					while(matchMathSequence()) {}
+					builderToChar();
 					markAccent();
 					return me.clearStringBuilder();
 				} else if(boldskip) {
@@ -1964,8 +1965,13 @@
 					}
 				case st.FPRINTABLE_SPC_CMB_SCAN:
 					if(cell.isBoundY()) {
-						quadro.moveUp();
-						return st.FPRINTABLE_SPC_CMB_RET_DOWN;
+						if(cell.markCmbTemp) {
+							cell.markCmbTemp = false;
+							return st.FPRINTABLE_SPC_2;
+						} else {
+							quadro.moveUp();
+							return st.FPRINTABLE_SPC_CMB_RET_DOWN;
+						}
 					} else if(cell.getChar() === 'v' &&
 							/[\/_]/.test(quadro.getCellRel(1, -1).getChar())) {
 						quadro.moveUp();
