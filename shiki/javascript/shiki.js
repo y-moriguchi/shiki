@@ -379,7 +379,11 @@
 			me.isMatrixEnd = function() {
 				return (me.markReturn[0] === 'INIT' ||
 						me.markReturn[me.markReturn.length - 1] === 'FRAC1' ||
-						me.markReturn[me.markReturn.length - 1] === 'FRAC2');
+						me.markReturn[me.markReturn.length - 1] === 'FRAC2' ||
+						me.markReturn[me.markReturn.length - 1] === 'ROOTBASE' ||
+						me.markReturn[me.markReturn.length - 1] === 'POW' ||
+						me.markReturn[me.markReturn.length - 1] === 'POW_AFTER_SUB' ||
+						me.markReturn[me.markReturn.length - 1] === 'SUB');
 			};
 			return me;
 		}
@@ -679,12 +683,15 @@
 			function isMatrixByScanning(direction) {
 				var i,
 					cell,
-					ch;
+					ch,
+					barcount;
 				if(!((me.get().getChar() === '\\' && direction < 0) ||
 						(me.get().getChar() === '/' && direction > 0) ||
-						me.get().getChar() === '-')) {
+						me.get().getChar() === '-' ||
+						me.get().getChar() === '|')) {
 					return false;
 				}
+				barcount = me.get().getChar() === '|' ? 1 : -1;
 				for(i = direction;; i += direction) {
 					cell = getPosRel(0, i);
 					ch = cell.getChar();
@@ -693,7 +700,9 @@
 							ch === '-') {
 						return true;
 					} else if(ch !== '|') {
-						return false;
+						return barcount > 1;
+					} else if(barcount > 0) {
+						barcount++;
 					}
 				}
 			}
@@ -705,19 +714,7 @@
 						me.moveDown();
 					}
 				}
-				var ch;
-				for(;;) {
-					moveHead(direction);
-					ch = me.get().getChar();
-					if((ch === '/' && direction < 0) ||
-							(ch === '\\' && direction > 0) ||
-							ch === '-') {
-						moveHead(-direction);
-						return;
-					} else if(ch !== '|') {
-						throw 'Internal Error';
-					}
-				}
+				moveHead(direction);
 			}
 			me = {};
 			ilist = input.split(/\n/);
@@ -1744,11 +1741,22 @@
 						quadro.clearStringBuilder();
 						return st.FINIT;
 					} else if(/[\-\\]/.test(cell.getChar())) {
-						quadro.moveUp();
-						return st.INIT_CHECKARRAY_3;
+						if(quadro.getCellRight().getChar() === '-') {
+							quadro.get().markReturn.push('INIT');
+							quadro.clearStringBuilder();
+							return st.FINIT;
+						} else if(quadro.getCellDown().getChar() === '-') {
+							quadro.moveDown();
+							quadro.get().markReturn.push('INIT');
+							quadro.clearStringBuilder();
+							return st.FINIT;
+						} else {
+							quadro.moveUp();
+							return st.INIT_CHECKARRAY_3;
+						}
 					} else if(cell.isWhitespace()) {
 						quadro.moveUp();
-						return st.INIT_CHECHARRAY_3;
+						return st.INIT_CHECKARRAY_3;
 					} else {
 						quadro.moveDown();
 						return state;
@@ -1764,7 +1772,7 @@
 						return state;
 					} else {
 						quadro.moveDown().moveDown();
-						cell.markReturn.push('INIT');
+						quadro.get().markReturn.push('INIT');
 						quadro.clearStringBuilder();
 						return st.FINIT;
 					}
@@ -1884,7 +1892,7 @@
 						quadro.moveLeft();
 						quadro.get().markSub = true;
 						return directSum(NEXT_FSUB, st.FPRINTABLE_DRAWTEMP);
-					} else if(cell.isRootEnd()) {
+					} else if(cell.isRootEnd() || quadro.isMarkRootEndBelow()) {
 						if(cell.getChar() === '-') {
 							cell.markMinusTemp = true;
 							quadro.moveUp();
@@ -1965,12 +1973,8 @@
 							cell.markCmbBoundary) {
 						quadro.moveLeft().moveLeft();
 						return st.FPRINTABLE_RET;
-					} else if(cell.isRootEnd()) {
-						if(cell.getChar() === '-') {
-							cell.markMinusTemp = true;
-							quadro.moveLeft().moveUp();
-							return st.FPRINTABLE_MINUS_2;
-						} else if(cell.isPrintable()) {
+					} else if(cell.isRootEnd() || quadro.isMarkRootEndBelow()) {
+						if(cell.getChar() === '-' || cell.isPrintable()) {
 							quadro.moveLeft();
 							quadro.appendBuilder();
 							quadro.get().markProcessed();
@@ -2689,8 +2693,12 @@
 					if(cell.isBoundY()) {
 						quadro.moveUp().moveLeft();
 						return st.FSUB_RET_DOWN;
-					} else if(quadro.isSumInt(1)) {
-						quadro.moveDownIfNotMulti();
+					} else if(quadro.isMatrixByScanningDown() || quadro.isSumInt(1)) {
+						if(quadro.isSumInt(1)) {
+							quadro.moveDownIfNotMulti();
+						} else {
+							quadro.moveMatrixDown();
+						}
 						quadro.get().markReturn.push('SUB');
 						quadro.clearStringBuilder();
 						quadro.newModel();
@@ -2731,8 +2739,12 @@
 					if(cell.isBoundY() || cell.markCmbBoundary) {
 						quadro.moveDown().moveLeft();
 						return st.FPOW_RET_DOWN;
-					} else if(quadro.isSumInt(-1)) {
-						quadro.moveUpIfNotMulti();
+					} else if(quadro.isMatrixByScanningUp() || quadro.isSumInt(-1)) {
+						if(quadro.isSumInt(-1)) {
+							quadro.moveUpIfNotMulti();
+						} else {
+							quadro.moveMatrixUp();
+						}
 						quadro.get().markReturn.push('POW');
 						quadro.clearStringBuilder();
 						quadro.newModel();
@@ -2835,8 +2847,7 @@
 							cell.markTemp) {
 						quadro.moveDown();
 						return st.FRAC_SCAN_BACK;
-					} else if(quadro.isMatrixByScanningUp() ||
-							quadro.isSumInt(-1)) {
+					} else if(quadro.isMatrixByScanningUp() || quadro.isSumInt(-1)) {
 						if(quadro.isSumInt(-1)) {
 							quadro.moveUpIfNotMulti();
 						} else {
@@ -3010,8 +3021,12 @@
 						return st.ROOT_SCAN;
 					}
 				case st.ROOT_SCAN:
-					if(quadro.isSumInt(1)) {
-						quadro.moveDownIfNotMulti();
+					if(quadro.isMatrixByScanningDown() || quadro.isSumInt(1)) {
+						if(quadro.isSumInt(1)) {
+							quadro.moveDownIfNotMulti();
+						} else {
+							quadro.moveMatrixDown();
+						}
 						quadro.moveReturnStack();
 						quadro.get().markReturn.push('ROOTBASE');
 						quadro.clearStringBuilder();
@@ -3059,15 +3074,17 @@
 					cell.markMatrixStart = true;
 					return st.MATRIX_RANGE;
 				case st.MATRIX_RANGE:
-					cell.markMatrixRange = true;
 					if(cell.getChar() === '|') {
+						cell.markMatrixRange = true;
 						quadro.moveUp();
 						return state;
 					} else if(cell.getChar() === '/') {
+						cell.markMatrixRange = true;
 						quadro.moveRight();
 						quadro.matrixType = '()';
 						return st.MATRIX_RANGE_2;
-					} else if(cell.getChar() === '-') {
+					} else if(cell.getChar() === '-' && !cell.isProcessed()) {
+						cell.markMatrixRange = true;
 						quadro.moveRight();
 						quadro.matrixType = '[]';
 						return st.MATRIX_RANGE_2;
@@ -3086,7 +3103,7 @@
 					} else if(cell.getChar() === '\\') {
 						quadro.moveDown();
 						return st.MATRIX_RANGE_3;
-					} else if(cell.getChar() === '-') {
+					} else if(cell.getChar() === '-' && !cell.isProcessed()) {
 						quadro.moveDown();
 						return st.MATRIX_RANGE_3;
 					} else {
@@ -3094,14 +3111,16 @@
 						return state;
 					}
 				case st.MATRIX_RANGE_3:
-					cell.markMatrixRange = true;
 					if(cell.getChar() === '|') {
+						cell.markMatrixRange = true;
 						quadro.moveDown();
 						return state;
 					} else if(cell.getChar() === '/') {
+						cell.markMatrixRange = true;
 						quadro.moveLeft();
 						return st.MATRIX_RANGE_4;
-					} else if(cell.getChar() === '-') {
+					} else if(cell.getChar() === '-' && !cell.isProcessed()) {
+						cell.markMatrixRange = true;
 						quadro.moveLeft();
 						return st.MATRIX_RANGE_4;
 					} else {
@@ -3118,7 +3137,7 @@
 					} else if(cell.getChar() === '\\') {
 						quadro.moveUp();
 						return st.MATRIX_RANGE_5;
-					} else if(cell.getChar() === '-') {
+					} else if(cell.getChar() === '-' && !cell.isProcessed()) {
 						quadro.moveUp();
 						return st.MATRIX_RANGE_5;
 					} else {
@@ -3405,11 +3424,18 @@
 					}
 				case st.MATRIX_END_4:
 					cell.markProcessed();
-					quadro.moveRight();
 					if(cell.markMatrixRange) {
 						quadro.addModel(new Matrix(quadro.matrixElements, quadro.matrixType));
-						return st.FPRINTABLE;
+						quadro.matrixType = false;
+						if(quadro.isMarkRootEndBelow()) {
+							cell.markIgnoreSubPow = true;
+							return st.FPRINTABLE_RET;
+						} else {
+							quadro.moveRight();
+							return st.FPRINTABLE;
+						}
 					} else {
+						quadro.moveRight();
 						return state;
 					}
 				case st.MATRIX_END_INIT:
@@ -3428,15 +3454,15 @@
 						return st.MATRIX_END_INIT_3;
 					}
 				case st.MATRIX_END_INIT_3:
-					if(quadro.isPrintableRight()) {
-						quadro.moveLeft();
-						return st.MATRIX_END_INITBASE;
-					} else if(cell.markMatrixRange) {
-						quadro.moveDown();
-						return state;
-					} else {
+					if(!cell.markMatrixRange) {
 						quadro.moveUp();
 						return st.MATRIX_END_INIT_4;
+					} else if(quadro.isPrintableRight()) {
+						quadro.moveLeft();
+						return st.MATRIX_END_INITBASE;
+					} else {
+						quadro.moveDown();
+						return state;
 					}
 				case st.MATRIX_END_INIT_4:
 					if(cell.markMatrixRange) {
@@ -3464,27 +3490,27 @@
 						return state;
 					}
 				case st.MATRIX_END_INITBASE_2:
-					if(cell.isMatrixEnd()) {
+					if(!cell.markMatrixRange) {
+						quadro.moveDown();
+						return st.MATRIX_END_INITBASE_3;
+					} else if(cell.isMatrixEnd()) {
 						quadro.matrixMoveInit = cell.markReturn;
 						cell.markReturn = [];
 						return st.MATRIX_END_INITBASE_FOUND_UP;
-					} else if(cell.markMatrixRange) {
+					} else {
 						quadro.moveUp();
 						return state;
-					} else {
-						quadro.moveDown();
-						return st.MATRIX_END_INITBASE_3;
 					}
 				case st.MATRIX_END_INITBASE_3:
-					if(cell.isMatrixEnd()) {
+					if(!cell.markMatrixRange) {
+						throw 'Internal Error';
+					} else if(cell.isMatrixEnd()) {
 						quadro.matrixMoveInit = cell.markReturn;
 						cell.markReturn = [];
 						return st.MATRIX_END_INITBASE_FOUND_DOWN;
-					} else if(cell.markMatrixRange) {
+					} else {
 						quadro.moveDown();
 						return state;
-					} else {
-						throw 'Internal Error';
 					}
 				case st.MATRIX_END_INITBASE_FOUND_UP:
 					if(cell.markMatrixInit) {
@@ -3510,7 +3536,13 @@
 					cell.markProcessed();
 					if(cell.markMatrixRange) {
 						quadro.addModel(new Matrix(quadro.matrixElements, quadro.matrixType));
-						return st.FPRINTABLE;
+						quadro.matrixType = false;
+						if(quadro.isMarkRootEndBelow()) {
+							cell.markIgnoreSubPow = true;
+							return st.FPRINTABLE_RET;
+						} else {
+							return st.FPRINTABLE;
+						}
 					} else {
 						quadro.moveRight();
 						return state;
@@ -3854,8 +3886,12 @@
 							cell.markTemp ||
 							cell.markSumBase) {
 						return st.FRET_SUB_FPOW_RET_DOWN;
-					} else if(quadro.isSumInt(-1)) {
-						quadro.moveUpIfNotMulti();
+					} else if(quadro.isMatrixByScanningUp() || quadro.isSumInt(-1)) {
+						if(quadro.isSumInt(-1)) {
+							quadro.moveUpIfNotMulti();
+						} else {
+							quadro.moveMatrixUp();
+						}
 						quadro.get().markReturn.push('POW_AFTER_SUB');
 						quadro.clearStringBuilder();
 						quadro.newModel();
@@ -4100,8 +4136,8 @@
 					}
 				case st.FRET_ROOT_BASE2:
 					if(quadro.isMarkRootEndBelow()) {
-						quadro.clearMarkRootEndBelow();
 						cell.markProcessed();
+						quadro.clearMarkRootEndBelow();
 						if(!quadro.isMarkRootEndBelow()) {
 							quadro.moveRight();
 						}
