@@ -308,6 +308,7 @@
 			me.markRootEnd = 0;
 			me.markRootWall = false;
 			me.markRootBase = false;
+			me.markRootProcessed = false;
 			me.markPow = false;
 			me.markPowProcessed = false;
 			me.markPowRight = false;
@@ -374,6 +375,11 @@
 			};
 			me.isRootEnd = function() {
 				return me.markRootEnd || me.markRootWall;
+			};
+			me.isMatrixEnd = function() {
+				return (me.markReturn[0] === 'INIT' ||
+						me.markReturn[me.markReturn.length - 1] === 'FRAC1' ||
+						me.markReturn[me.markReturn.length - 1] === 'FRAC2');
 			};
 			return me;
 		}
@@ -667,6 +673,49 @@
 						return true;
 					} else if(cell.isBoundY() || !cell.isWhitespace()) {
 						return false;
+					}
+				}
+			}
+			function isMatrixByScanning(direction) {
+				var i,
+					cell,
+					ch;
+				if(!((me.get().getChar() === '\\' && direction < 0) ||
+						(me.get().getChar() === '/' && direction > 0) ||
+						me.get().getChar() === '-')) {
+					return false;
+				}
+				for(i = direction;; i += direction) {
+					cell = getPosRel(0, i);
+					ch = cell.getChar();
+					if((ch === '/' && direction < 0) ||
+							(ch === '\\' && direction > 0) ||
+							ch === '-') {
+						return true;
+					} else if(ch !== '|') {
+						return false;
+					}
+				}
+			}
+			function moveMatrix(direction) {
+				function moveHead(direction) {
+					if(direction < 0) {
+						me.moveUp();
+					} else {
+						me.moveDown();
+					}
+				}
+				var ch;
+				for(;;) {
+					moveHead(direction);
+					ch = me.get().getChar();
+					if((ch === '/' && direction < 0) ||
+							(ch === '\\' && direction > 0) ||
+							ch === '-') {
+						moveHead(-direction);
+						return;
+					} else if(ch !== '|') {
+						throw 'Internal Error';
 					}
 				}
 			}
@@ -1121,15 +1170,16 @@
 						down.isPrintable() &&
 						!down.isTraversed());
 			};
-			me.isMarkRootEndBelow = function() {
+			me.isMarkRootEndBelow = function(threshold) {
 				var i,
-					cell;
+					cell,
+					th = threshold ? threshold : 0;
 				for(i = 0;; i++) {
 					cell = getPosRel(0, i);
 					if(cell.isOutsideY()) {
 						return false;
 					} else if(cell.markRootEnd) {
-						return true;
+						return cell.markRootEnd > th;
 					}
 				}
 			};
@@ -1177,6 +1227,29 @@
 				}
 				me.moveReturnStackHere(wall);
 			};
+			me.markRootSubPowProcessedLeft = function() {
+				var i,
+					cell;
+				if(!me.get().markRootWall) {
+					return;
+				}
+				me.get().markRootProcessed = true;
+				for(i = 1;; i++) {
+					cell = getPosRel(-i, 0);
+					if(cell.markRoot || cell.markRootWall) {
+						cell.markSubPowProcessed = true;
+						cell.markRootProcessed = true;
+						cell.markProcessed();
+						return;
+					} else if(cell.getChar() === ' ') {
+						cell.markSubPowProcessed = true;
+						cell.markRootProcessed = true;
+						cell.markProcessed();
+					} else {
+						return;
+					}
+				}
+			};
 			me.isPrintableRight = function() {
 				var i,
 					cell;
@@ -1200,6 +1273,23 @@
 						return true;
 					}
 				}
+			};
+			me.moveRootProcessedRight = function() {
+				while(me.get().markRootProcessed) {
+					me.moveRight();
+				}
+			};
+			me.isMatrixByScanningUp = function() {
+				return isMatrixByScanning(-1);
+			};
+			me.isMatrixByScanningDown = function() {
+				return isMatrixByScanning(1);
+			};
+			me.moveMatrixUp = function() {
+				moveMatrix(-1);
+			};
+			me.moveMatrixDown = function() {
+				moveMatrix(1);
 			};
 			me.operator = false;
 			me.storeMathSign = [];
@@ -2547,10 +2637,9 @@
 						if(quadro.isModelNotScan()) {
 							return st.FRET;
 						} else {
+							quadro.moveRootProcessedRight();
 							return st.FPRINTABLE_DRAWTEMP;
 						}
-					} else if(quadro.isMarkStartRoot()) {
-						throw 'aaaaaaa';
 					} else {
 						quadro.moveLeft();
 						return state;
@@ -2746,8 +2835,13 @@
 							cell.markTemp) {
 						quadro.moveDown();
 						return st.FRAC_SCAN_BACK;
-					} else if(quadro.isSumInt(-1)) {
-						quadro.moveUpIfNotMulti();
+					} else if(quadro.isMatrixByScanningUp() ||
+							quadro.isSumInt(-1)) {
+						if(quadro.isSumInt(-1)) {
+							quadro.moveUpIfNotMulti();
+						} else {
+							quadro.moveMatrixUp();
+						}
 						quadro.get().markReturn.push('FRAC1');
 						quadro.flushBuilder();
 						quadro.clearStringBuilder();
@@ -2789,8 +2883,13 @@
 							cell.markTemp) {
 						quadro.moveUp();
 						return st.DENO_SCAN_BACK;
-					} else if(quadro.isSumInt(1)) {
-						quadro.moveDownIfNotMulti();
+					} else if(quadro.isMatrixByScanningDown() ||
+							quadro.isSumInt(1)) {
+						if(quadro.isSumInt(1)) {
+							quadro.moveDownIfNotMulti();
+						} else {
+							quadro.moveMatrixDown();
+						}
 						quadro.get().markReturn.push('FRAC2');
 						quadro.clearStringBuilder();
 						quadro.newModel();
@@ -3299,7 +3398,7 @@
 					if(cell.markMatrixStart) {
 						cell.markProcessed();
 						quadro.moveRight();
-						return cell.markReturn[0] === 'INIT' ? st.MATRIX_END_INIT : st.MATRIX_END_4;
+						return cell.isMatrixEnd() ? st.MATRIX_END_INIT : st.MATRIX_END_4;
 					} else {
 						quadro.moveDown();
 						return state;
@@ -3348,7 +3447,7 @@
 						return st.MATRIX_END_INIT_5;
 					}
 				case st.MATRIX_END_INIT_5:
-					if(cell.markReturn[0] === 'INIT') {
+					if(cell.isMatrixEnd()) {
 						cell.markProcessed();
 						quadro.moveRight();
 						return st.MATRIX_END_INITBASE_FOUND;
@@ -3365,7 +3464,7 @@
 						return state;
 					}
 				case st.MATRIX_END_INITBASE_2:
-					if(cell.markReturn[0] === 'INIT') {
+					if(cell.isMatrixEnd()) {
 						quadro.matrixMoveInit = cell.markReturn;
 						cell.markReturn = [];
 						return st.MATRIX_END_INITBASE_FOUND_UP;
@@ -3377,7 +3476,7 @@
 						return st.MATRIX_END_INITBASE_3;
 					}
 				case st.MATRIX_END_INITBASE_3:
-					if(cell.markReturn[0] === 'INIT') {
+					if(cell.isMatrixEnd()) {
 						quadro.matrixMoveInit = cell.markReturn;
 						cell.markReturn = [];
 						return st.MATRIX_END_INITBASE_FOUND_DOWN;
@@ -3991,6 +4090,8 @@
 					if(cell.markRoot || cell.markRootWall) {
 						cell.markRoot = false;
 						cell.markProcessed();
+						cell.markSubPowProcessed = true;
+						quadro.markRootSubPowProcessedLeft();
 						quadro.moveRight();
 						return st.FRET_ROOT_BASE2;
 					} else {
@@ -4001,7 +4102,9 @@
 					if(quadro.isMarkRootEndBelow()) {
 						quadro.clearMarkRootEndBelow();
 						cell.markProcessed();
-						quadro.moveRight();
+						if(!quadro.isMarkRootEndBelow()) {
+							quadro.moveRight();
+						}
 						return st.FPRINTABLE;
 					} else {
 						cell.markProcessed();
