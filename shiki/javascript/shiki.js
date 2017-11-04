@@ -303,6 +303,7 @@
 			};
 			me.markTemp = false;
 			me.markFraction = false;
+			me.markBinomialBorder = false;
 			me.markRoot = false;
 			me.markRootNum = false;
 			me.markRootEnd = 0;
@@ -1356,6 +1357,40 @@
 				me.get().markNumberOfRootV.unshift.apply(
 						me.get().markNumberOfRootV, me.matrixMoveInit[1]);
 			};
+			me.isBinomial = function() {
+				var i,
+					cell,
+					ch;
+				if(me.get().getChar() !== '(') {
+					return false;
+				}
+				for(i = 1;; i++) {
+					cell = getPosRel(i, 0);
+					ch = cell.getChar();
+					if(ch === ')') {
+						return i > 1;
+					} else if(ch !== ' ') {
+						return false;
+					}
+				}
+			};
+			me.drawBinomialBorder = function() {
+				var i,
+					cell,
+					ch;
+				me.get().markBinomialBorder = true;
+				for(i = 1;; i++) {
+					cell = getPosRel(i, 0);
+					ch = cell.getChar();
+					if(ch === ')') {
+						cell.markBinomialBorder = true;
+						return;
+					} else if(ch !== ' ') {
+						throw 'Internal Error';
+					}
+					cell.markBinomialBorder = true;
+				}
+			};
 			me.operator = false;
 			me.storeMathSign = [];
 			me.matrixType = '';
@@ -1371,6 +1406,7 @@
 			me.parenStack = false;
 			me.barCount = false;
 			me.countRootWalls = 0;
+			me.fractionOrBinomial = false;
 			return me;
 		}
 		function parseEngine(quadro, trans) {
@@ -1977,6 +2013,10 @@
 							quadro.moveLeft();
 							return st.FPRINTABLE_RET;
 						}
+					} else if(quadro.isBinomial()) {
+						quadro.drawBinomialBorder();
+						cell.markFraction = 'BINOMIAL';
+						return st.FRAC_INIT;
 					} else if(cell.getChar() === '-') {
 						quadro.moveRight();
 						return st.FPRINTABLE_MINUS;
@@ -2266,7 +2306,7 @@
 					}
 				case st.FPRINTABLE_MINUS:
 					if(cell.getChar() == '-') {
-						quadro.moveLeft().get().markFraction = true;
+						quadro.moveLeft().get().markFraction = 'FRAC2';
 						return st.FRAC_INIT;
 					} else {
 						quadro.moveLeft();
@@ -2286,7 +2326,7 @@
 				case st.FPRINTABLE_MINUS_3_T:
 					if(cell.markMinusTemp) {
 						cell.markMinusTemp = false;
-						cell.markFraction = true;
+						cell.markFraction = 'FRAC2';
 						return st.FRAC_INIT;
 					} else {
 						quadro.moveDown();
@@ -2902,7 +2942,7 @@
 						return st.FPRINTABLE;
 					}
 				case st.FRAC_INIT:
-					if(cell.getChar() === '-') {
+					if(cell.getChar() === '-' || cell.markBinomialBorder) {
 						cell.markProcessed();
 						quadro.moveRight();
 						return state;
@@ -2919,7 +2959,7 @@
 						return state;
 					}
 				case st.FRAC_DRAWLINE_2:
-					if(cell.getChar() === '-') {
+					if(cell.getChar() === '-' || cell.markBinomialBorder) {
 						return st.FRAC_BAR_BACK;
 					} else {
 						quadro.moveLeft();
@@ -2995,12 +3035,14 @@
 						} else {
 							quadro.moveMatrixDown();
 						}
-						quadro.get().markReturn.push('FRAC2');
+						quadro.get().markReturn.push(quadro.fractionOrBinomial);
+						quadro.fractionOrBinomial = false;
 						quadro.clearStringBuilder();
 						quadro.newModel();
 						return st.FINIT;
 					} else if(cell.isPrintable() && !quadro.isCellBar() && !quadro.isAccent()) {
-						quadro.fracRootLabel = 'FRAC2';
+						quadro.fracRootLabel = quadro.fractionOrBinomial;
+						quadro.fractionOrBinomial = false;
 						quadro.fracRootGoto = st.FINIT;
 						quadro.fracRootAction = function() {
 							quadro.clearStringBuilder();
@@ -3863,6 +3905,13 @@
 						quadro.clearStringBuilder();
 						quadro.moveUp();
 						return st.FRET_FRAC2_1;
+					case 'BINOMIAL':
+						v2 = quadro.popModel();
+						v1 = quadro.popModel();
+						quadro.addModel(new Binomial(v1, v2));
+						quadro.clearStringBuilder();
+						quadro.moveUp();
+						return st.FRET_FRAC2_1;
 					case 'ROOTBASE':
 						v2 = quadro.popModel();
 						v1 = quadro.popModel();
@@ -4153,7 +4202,8 @@
 						return st.FPRINTABLE;
 					}
 				case st.FRET_FRAC1_1:
-					if(cell.getChar() === '-' && cell.isProcessed()) {
+					if((cell.getChar() === '-' || cell.markBinomialBorder) &&
+							cell.isProcessed()) {
 						return st.FRET_FRAC1_2;
 					} else {
 						quadro.moveDown();
@@ -4162,13 +4212,15 @@
 				case st.FRET_FRAC1_2:
 					if(cell.markFraction) {
 						quadro.moveDown();
+						quadro.fractionOrBinomial = cell.markFraction;
 						return st.DENO_SCAN;
 					} else {
 						quadro.moveLeft();
 						return state;
 					}
 				case st.FRET_FRAC2_1:
-					if(cell.getChar() === '-' && cell.isProcessed()) {
+					if((cell.getChar() === '-' || cell.markBinomialBorder) &&
+							cell.isProcessed()) {
 						return st.FRET_FRAC2_2;
 					} else {
 						quadro.moveUp();
@@ -4205,8 +4257,13 @@
 					}
 				case st.FRET_FRAC2_5:
 					if(cell.isProcessed()) {
-						quadro.moveRight();
-						return st.FPRINTABLE;
+						if(quadro.isMarkRootEndBelow()) {
+							cell.markIgnoreSubPow = true;
+							return st.FPRINTABLE_RET;
+						} else {
+							quadro.moveRight();
+							return st.FPRINTABLE;
+						}
 					} else {
 						quadro.moveLeft();
 						return state;
@@ -4531,6 +4588,14 @@
 		Fraction.prototype.toLaTeX = function() {
 			return ("\\frac{" + this.numerator.toLaTeX() +
 					"}{" + this.denominator.toLaTeX() + "}");
+		};
+		function Binomial(up, down) {
+			this.up = up;
+			this.down = down;
+		}
+		Binomial.prototype.toLaTeX = function() {
+			return ("\\binom{" + this.up.toLaTeX() +
+					"}{" + this.down.toLaTeX() + "}");
 		};
 		function Pow(value, pow) {
 			this.value = value;
