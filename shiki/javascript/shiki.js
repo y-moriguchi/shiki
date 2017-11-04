@@ -287,7 +287,7 @@
 			me = {};
 			st = String.fromCharCode(ch);
 			me.getChar = function() {
-				return st;
+				return me.markRootIgnore ? ' ' : st;
 			};
 			me.getCharCode = function() {
 				return ch;
@@ -309,6 +309,8 @@
 			me.markRootWall = false;
 			me.markRootBase = false;
 			me.markRootProcessed = false;
+			me.markRootStartV = false;
+			me.markRootIgnore = false;
 			me.markPow = false;
 			me.markPowProcessed = false;
 			me.markPowRight = false;
@@ -323,6 +325,7 @@
 			me.markIntTempStart = false;
 			me.markSumMathSign = '';
 			me.markReturn = [];
+			me.markNumberOfRootV = [];
 			me.markMatrixRange = false;
 			me.markMatrixStart = false;
 			me.markMatrixRowSeparator = false;
@@ -351,16 +354,16 @@
 				if(ch < 0) {
 					return false;
 				}
-				return printableRE.test(st);
+				return printableRE.test(me.getChar());
 			};
 			me.isWhitespace = function() {
-				return /[ \t\n]/.test(st);
+				return /[ \t\n]/.test(me.getChar());
 			};
 			me.isOperator = function() {
-				return /[+\-\*\/=]/.test(st);
+				return /[+\-\*\/=]/.test(me.getChar());
 			};
 			me.isVector = function() {
-				return /[>]/.test(st) && !processed;
+				return /[>]/.test(me.getChar()) && !processed;
 			};
 			me.isTraversed = function() {
 				return processed || me.markRootWall || me.markSumSign;
@@ -1201,7 +1204,10 @@
 					cell = getPosRel(-i - wall, i);
 					if(cell.markReturn.length > 0) {
 						me.get().markReturn.unshift.apply(me.get().markReturn, cell.markReturn);
+						me.get().markNumberOfRootV.unshift.apply(
+								me.get().markNumberOfRootV, cell.markNumberOfRootV);
 						cell.markReturn = [];
+						cell.markNumberOfRootV = [];
 						return;
 					} else if(cell.isOutsideX() || cell.isOutsideY()) {
 						throw 'Internal Error';
@@ -1271,6 +1277,58 @@
 					}
 				}
 			};
+			me.isAboveSlashRootWall = function() {
+				var i,
+					cell;
+				for(i = 1;; i++) {
+					cell = getPosRel(0, -i);
+					if(cell.markRoot || cell.markRootWall) {
+						return cell.getChar() === '/';
+					} else if(cell.isOutsideY()) {
+						throw 'Internal Error';
+					}
+				}
+			};
+			me.isRootNotation = function() {
+				var i,
+					cell,
+					ch;
+				if(me.get().getChar() === 'v') {
+					for(i = 1;; i++) {
+						cell = getPosRel(i, -i);
+						ch = cell.getChar();
+						if(ch === '_') {
+							return true;
+						} else if(ch !== '/') {
+							return false;
+						}
+					}
+				}
+			};
+			me.markRootIgnoreUpperWall = function() {
+				var wall,
+					i,
+					cell,
+					ch;
+				for(wall = 1;; wall++) {
+					cell = getPosRel(wall, -wall);
+					ch = cell.getChar();
+					if(ch === '_') {
+						break;
+					} else if(ch !== '/') {
+						throw 'Internal Error';
+					}
+				}
+				for(i = 0;; i++) {
+					cell = getPosRel(wall + i, -wall);
+					ch = cell.getChar();
+					if(ch === '_') {
+						cell.markRootIgnore = true;
+					} else {
+						return;
+					}
+				}
+			};
 			me.moveRootProcessedRight = function() {
 				while(me.get().markRootProcessed) {
 					me.moveRight();
@@ -1288,6 +1346,16 @@
 			me.moveMatrixDown = function() {
 				moveMatrix(1);
 			};
+			me.setMatrixMoveInit = function() {
+				me.matrixMoveInit = [me.get().markReturn, me.get().markNumberOfRootV];
+				me.get().markReturn = [];
+				me.get().markNumberOfRootV = [];
+			};
+			me.putMatrixMoveInit = function() {
+				me.get().markReturn.unshift.apply(me.get().markReturn, me.matrixMoveInit[0]);
+				me.get().markNumberOfRootV.unshift.apply(
+						me.get().markNumberOfRootV, me.matrixMoveInit[1]);
+			};
 			me.operator = false;
 			me.storeMathSign = [];
 			me.matrixType = '';
@@ -1302,6 +1370,7 @@
 			me.fracRootAction = false;
 			me.parenStack = false;
 			me.barCount = false;
+			me.countRootWalls = 0;
 			return me;
 		}
 		function parseEngine(quadro, trans) {
@@ -1401,6 +1470,8 @@
 			st.addState("FPRINTABLE_V_SLASH2");
 			st.addState("FPRINTABLE_V_SLASH3");
 			st.addState("FPRINTABLE_V_SLASH4");
+			st.addState("FPRINTABLE_V_COUNT");
+			st.addState("FPRINTABLE_V_COUNT_2");
 			st.addState("FPRINTABLE_V_NUM");
 			st.addState("FPRINTABLE_V_NUMRET");
 			st.addState("FPRINTABLE_V_NUMRET_2");
@@ -2286,10 +2357,33 @@
 						quadro.moveLeft().moveDown();
 						return state;
 					} else if(cell.getChar() === 'v') {
+						cell.markRootStartV = true;
+						quadro.moveRight();
+						quadro.countRootWalls = 1;
+						return st.FPRINTABLE_V_COUNT;
+					} else {
+						throw 'Internal Error';
+					}
+				case st.FPRINTABLE_V_COUNT:
+					if(quadro.isAboveSlashRootWall()) {
+						if(quadro.isRootNotation()) {
+							quadro.markRootIgnoreUpperWall();
+							quadro.countRootWalls++;
+						}
+						quadro.moveRight();
+						return state;
+					} else {
+						quadro.moveLeft();
+						return st.FPRINTABLE_V_COUNT_2;
+					}
+				case st.FPRINTABLE_V_COUNT_2:
+					if(cell.markRootStartV) {
+						cell.markRootStartV = false;
 						quadro.moveUp();
 						return st.FPRINTABLE_V_NUM;
 					} else {
-						throw 'Internal Error';
+						quadro.moveLeft();
+						return state;
 					}
 				case st.FPRINTABLE_V_NUM:
 					if(cell.isOutsideY() ||
@@ -3029,6 +3123,8 @@
 						}
 						quadro.moveReturnStack();
 						quadro.get().markReturn.push('ROOTBASE');
+						quadro.get().markNumberOfRootV.push(quadro.countRootWalls);
+						quadro.countRootWalls = false;
 						quadro.clearStringBuilder();
 						quadro.newModel();
 						return st.FINIT;
@@ -3037,6 +3133,8 @@
 						quadro.fracRootGoto = st.FINIT;
 						quadro.fracRootAction = function() {
 							quadro.moveReturnStack();
+							quadro.get().markNumberOfRootV.push(quadro.countRootWalls);
+							quadro.countRootWalls = false;
 							quadro.clearStringBuilder();
 							quadro.newModel();
 						}
@@ -3494,8 +3592,7 @@
 						quadro.moveDown();
 						return st.MATRIX_END_INITBASE_3;
 					} else if(cell.isMatrixEnd()) {
-						quadro.matrixMoveInit = cell.markReturn;
-						cell.markReturn = [];
+						quadro.setMatrixMoveInit();
 						return st.MATRIX_END_INITBASE_FOUND_UP;
 					} else {
 						quadro.moveUp();
@@ -3505,8 +3602,7 @@
 					if(!cell.markMatrixRange) {
 						throw 'Internal Error';
 					} else if(cell.isMatrixEnd()) {
-						quadro.matrixMoveInit = cell.markReturn;
-						cell.markReturn = [];
+						quadro.setMatrixMoveInit();
 						return st.MATRIX_END_INITBASE_FOUND_DOWN;
 					} else {
 						quadro.moveDown();
@@ -3514,7 +3610,7 @@
 					}
 				case st.MATRIX_END_INITBASE_FOUND_UP:
 					if(cell.markMatrixInit) {
-						cell.markReturn.unshift.apply(cell.markReturn, quadro.matrixMoveInit);
+						quadro.putMatrixMoveInit();
 						cell.markProcessed();
 						quadro.moveRight();
 						return st.MATRIX_END_INITBASE_FOUND;
@@ -3524,7 +3620,7 @@
 					}
 				case st.MATRIX_END_INITBASE_FOUND_DOWN:
 					if(cell.markMatrixInit) {
-						cell.markReturn.unshift.apply(cell.markReturn, quadro.matrixMoveInit);
+						quadro.putMatrixMoveInit();
 						cell.markProcessed();
 						quadro.moveRight();
 						return st.MATRIX_END_INITBASE_FOUND;
@@ -3770,7 +3866,7 @@
 					case 'ROOTBASE':
 						v2 = quadro.popModel();
 						v1 = quadro.popModel();
-						quadro.addModel(new Root(v1, v2));
+						quadro.addModel(new Root(v1, v2, cell.markNumberOfRootV.pop()));
 						quadro.clearStringBuilder();
 						return st.FRET_ROOT_BASE;
 					case 'ROOT_N':
@@ -4492,17 +4588,28 @@
 				return this.value.toLaTeX() + "_{" + this.subs.toLaTeX() + "}";
 			}
 		};
-		function Root(num, value) {
+		function Root(num, value, count) {
 			this.num = num;
 			this.value = value;
+			this.count = count;
 		}
 		Root.prototype.toLaTeX = function() {
-			var nl = this.num.toLaTeX();
+			var nl = this.num.toLaTeX(),
+				res,
+				i;
 			if(nl === '') {
-				return "\\sqrt{" + this.value.toLaTeX() + "}";
+				res = "\\sqrt{";
 			} else {
-				return "\\sqrt[" + nl + "]{" + this.value.toLaTeX() + "}";
+				res = "\\sqrt[" + nl + "]{";
 			}
+			for(i = 1; i < this.count; i++) {
+				res += "\\sqrt{";
+			}
+			res += this.value.toLaTeX();
+			for(i = 0; i < this.count; i++) {
+				res += "}";
+			}
+			return res;
 		};
 		function Sum(mathsign, up, down) {
 			if(!up) {
