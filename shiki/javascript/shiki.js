@@ -24,7 +24,9 @@
 		scriptType: "text/x-shiki",
 		useAtAsRoundD: true,
 		useQuantumBracket: true,
-		useVerticalBarAsDifference: true
+		useVerticalBarAsDifference: true,
+		useUnicodeSigmaAsSum: true,
+		useUnicodePiAsProduct: true
 	};
 	function extend(base, extension) {
 		var i, res = {};
@@ -529,10 +531,10 @@
 						!getPosRel(3,  1 + yoffset).markSumSign);
 			}
 			function isSumMulti() {
-				return (getPosRelChar(0, 0) === '\n' &&
+				return (opt.useUnicodeSigmaAsSum &&
+						getPosRelChar(0, 0) === '\n' &&
 						(getPosRelChar(1, 0) === 'Σ' || getPosRelChar(1, 0) === '\u2211') &&
-						!getPosRel(1, 0).markSumSign &&
-						getPosRel(2, 0).isWhitespace());
+						!getPosRel(1, 0).markSumSign);
 			}
 			function isIntMulti() {
 				return (getPosRelChar(0, 0) === '\n' &&
@@ -550,10 +552,10 @@
 						!getPosRel(1, 0).markSumSign);
 			}
 			function isProdMulti() {
-				return (getPosRelChar(0, 0) === '\n' &&
+				return (opt.useUnicodePiAsProduct &&
+						getPosRelChar(0, 0) === '\n' &&
 						getPosRelChar(1, 0) === 'Π' &&
-						!getPosRel(1, 0).markSumSign &&
-						getPosRel(2, 0).isWhitespace());
+						!getPosRel(1, 0).markSumSign);
 			}
 			function isCupMulti() {
 				return (getPosRelChar(0, 0) === '\n' &&
