@@ -1199,18 +1199,27 @@
 					}
 				}
 			};
-			me.moveReturnStackHere = function(wallDistance) {
+			me.moveReturnStackHere = function(wallDistance, direction) {
 				var wall = wallDistance ? wallDistance : 0,
+					drc = direction ? direction : 1,
 					i,
-					cell;
-				for(i = 0;; i++) {
+					cell,
+					mto;
+				mto = getPosRel(-wall, 0);
+				for(i = 0;; i += drc) {
 					cell = getPosRel(-i - wall, i);
 					if(cell.markReturn.length > 0) {
-						me.get().markReturn.unshift.apply(me.get().markReturn, cell.markReturn);
-						me.get().markNumberOfRootV.unshift.apply(
-								me.get().markNumberOfRootV, cell.markNumberOfRootV);
-						cell.markReturn = [];
-						cell.markNumberOfRootV = [];
+						if(i !== 0) {
+							mto.markReturn.unshift.apply(mto.markReturn, cell.markReturn);
+							mto.markNumberOfRootV.unshift.apply(
+									mto.markNumberOfRootV, cell.markNumberOfRootV);
+							mto.markRootBase = cell.markRootBase;
+							cell.markReturn = [];
+							cell.markNumberOfRootV = [];
+							cell.markRootBase = false;
+						}
+						return;
+					} else if(cell.markRoot) {
 						return;
 					} else if(cell.isOutsideX() || cell.isOutsideY()) {
 						throw 'Internal Error';
@@ -1339,6 +1348,60 @@
 			me.moveRootProcessedRight = function() {
 				while(me.get().markRootProcessed) {
 					me.moveRight();
+				}
+			};
+			me.moveToRootV = function() {
+				var cell,
+					ret;
+				for(ret = false;; ret = true) {
+					cell = me.get();
+					if((cell.markRootWall || cell.markRoot) && cell.getChar() === 'v') {
+						return ret;
+					} else if(cell.markRootWall || cell.markRoot) {
+						me.moveLeft().moveDown();
+					} else {
+						throw 'Internal Error';
+					}
+				}
+			};
+			me.moveRootToBase = function() {
+				var cell,
+					mrt;
+				me.moveToRootV();
+				mrt = me.get().markRoot;
+				me.get().markRoot = false;
+				if(mrt === 'MOVE') {
+					me.moveReturnStackHere(0, -1);
+					for(;;) {
+						cell = me.get();
+						if(cell.markRoot === 'BASE') {
+							return;
+						} else if(cell.markRootWall || cell.markRoot) {
+							me.moveRight().moveUp();
+						} else {
+							throw 'Internal Error';
+						}
+					}
+				}
+			};
+			me.scanRootBase = function(rootbase) {
+				var cell,
+					i;
+				for(i = 0;; i++) {
+					cell = getPosRel(-i, i);
+					if(!(cell.markRoot || cell.markRootWall)) {
+						return false;
+					} else if(cell.getChar() === 'v') {
+						break;
+					}
+				}
+				for(;; i--) {
+					cell = getPosRel(-i, i);
+					if(cell.markRootBase === rootbase) {
+						return i > 0 ? 3 : i < 0 ? 1 : 2;
+					} else if(!(cell.markRoot || cell.markRootWall)) {
+						return false;
+					}
 				}
 			};
 			me.isMatrixByScanningUp = function() {
@@ -1708,6 +1771,9 @@
 				NEXT_FPOW = BITMASK * 2,
 				nextLabel,
 				nextState;
+			function isTempRoot(val) {
+				return (val & BITMASK) > 0;
+			}
 			function directSum(state, next) {
 				return next + (Math.floor(state / BITMASK) * BITMASK);
 			}
@@ -1782,6 +1848,7 @@
 					t2,
 					t3,
 					t4,
+					basedirc,
 					i;
 				switch(state % BITMASK) {
 				case st.INIT:
@@ -2295,7 +2362,7 @@
 				case st.FPRINTABLE_SPC_ROOT_2:
 					cell.markProcessed();
 					if(cell.getChar() === '/') {
-						cell.markRoot = true;
+						cell.markRoot = 'BASE';
 						return st.FPRINTABLE_SPC_ROOT_3;
 					} else {
 						quadro.moveRight();
@@ -2361,7 +2428,7 @@
 					} else if(cell.getChar() == '_' || cell.getChar() == '/') {
 						quadro.moveLeft().moveDown();
 						quadro.get().markProcessed();
-						quadro.get().markRoot = true;
+						quadro.get().markRoot = 'BASE';
 						quadro.moveRight().moveUp();
 						return st.FPRINTABLE_V_SLASH;
 					} else {
@@ -2468,6 +2535,10 @@
 						quadro.moveRight();
 						return st.FPRINTABLE_V_COUNT;
 					} else if(cell.markRoot) {
+						if(quadro.moveToRootV()) {
+							quadro.get().markRoot = 'MOVE';
+							quadro.get().markProcessed();
+						}
 						quadro.flushBuilder();
 						quadro.newModel();
 						return directSum(NEXT_ROOT, st.FPRINTABLE_DRAWTEMP);
@@ -2794,7 +2865,8 @@
 						return state;
 					}
 				case st.FPRINTABLE_DRAWTEMP:
-					if(cell.markRootNum || (cell.markRootWall && !cell.markRootWallInner)) {
+					if(cell.markRootNum ||
+							(cell.markRootWall && !cell.markRootWallInner && cell.getChar() !== 'v')) {
 						return directSum(state, st.FPRINTABLE_DRAWTEMP2);
 					} else if(cell.isOutsideX()) {
 						quadro.moveLeft();
@@ -2835,7 +2907,7 @@
 						return state;
 					}
 				case st.FSUB_SCAN:
-					if(cell.isBoundY()) {
+					if(cell.isBoundY() && (!cell.markTemp || !isTempRoot(cell.markTemp))) {
 						quadro.moveUp().moveLeft();
 						return st.FSUB_RET_DOWN;
 					} else if(quadro.isMatrixByScanningDown() || quadro.isSumInt(1)) {
@@ -3036,7 +3108,7 @@
 							cell.markMatrixRowSeparator ||
 							cell.markCasesRowSeparator ||
 							cell.isProcessed() ||
-							cell.markTemp) {
+							(cell.markTemp && !isTempRoot(cell.markTemp))) {
 						quadro.moveUp();
 						return st.DENO_SCAN_BACK;
 					} else if(quadro.isMatrixByScanningDown() ||
@@ -3130,12 +3202,13 @@
 							cell.markReturn[cell.markReturn.length - 1] === 'FRAC1' ||
 							cell.markReturn[cell.markReturn.length - 1] === 'FRAC2' ||
 							cell.markReturn[cell.markReturn.length - 1] === 'ROOTBASE') {
+						cell.markRootBase = 'INITIAL';
 						return st.ROOT_CEIL6_INIT;
 					} else {
 						return st.ROOT_CEIL6_F;
 					}
 				case st.ROOT_CEIL6_INIT:
-					cell.markRootBase = true;
+					cell.markRootBase = cell.markRootBase ? cell.markRootBase : 'NOTINITIAL';
 					cell.markTemp = false;
 					if(cell.markRootEnd) {
 						quadro.moveUp();
@@ -4291,12 +4364,22 @@
 						return state;
 					}
 				case st.FRET_ROOT_BASE:
-					if(cell.markRoot || cell.markRootWall) {
+					if((basedirc = quadro.scanRootBase('INITIAL'))) {
+						basedirc -= 2;
+						if(basedirc !== 0) {
+							quadro.moveReturnStackHere(0, basedirc);
+						}
 						cell.markRoot = false;
 						cell.markProcessed();
 						cell.markSubPowProcessed = true;
 						quadro.markRootSubPowProcessedLeft();
-						quadro.moveRight();
+						return st.FRET_ROOT_BASE2;
+					} else if((cell.markRoot || cell.markRootWall) &&
+							!cell.markRootWallInner) {
+						quadro.moveRootToBase();
+						quadro.get().markProcessed();
+						quadro.get().markSubPowProcessed = true;
+						quadro.markRootSubPowProcessedLeft();
 						return st.FRET_ROOT_BASE2;
 					} else {
 						quadro.moveLeft();
