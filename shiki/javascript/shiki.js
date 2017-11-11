@@ -1511,6 +1511,7 @@
 			me.barCount = false;
 			me.countRootWalls = false;
 			me.fractionOrBinomial = false;
+			me.lengthRootV = 0;
 			return me;
 		}
 		function parseEngine(quadro, trans) {
@@ -4063,7 +4064,7 @@
 						v1 = quadro.popModel();
 						v2 = cell.markNumberOfRootV.pop();
 						quadro.clearStringBuilder();
-						if(cell.markNumberOfRootV.length > 0) {
+						if((quadro.lengthRootV = cell.markNumberOfRootV.length) > 0) {
 							quadro.pushModel(new Root(v2, v1));
 							cell.markReturn.push('ROOTBASE');
 						} else {
@@ -4439,7 +4440,9 @@
 						return st.FRET_ROOT_BASE2;
 					} else if((cell.markRoot || cell.markRootWall) &&
 							!cell.markRootWallInner) {
-						quadro.moveRootToBase();
+						if(quadro.lengthRootV === 0) {
+							quadro.moveRootToBase();
+						}
 						quadro.get().markProcessed();
 						quadro.get().markSubPowProcessed = true;
 						quadro.markRootSubPowProcessedLeft();
