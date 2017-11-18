@@ -4988,12 +4988,19 @@
 		res += "\\]";
 		return res;
 	}
+
 	if(!gl.Shiki) {
 		gl.Shiki = {};
 		gl.Shiki.parse = shiki;
 	}
 
-	if(window && window.document) {
+	// node.js
+	if(typeof process !== 'undefined' && typeof require !== 'undefined') {
+		exports.parse = shiki;
+	}
+
+	if(gl.window && gl.window.document) {
+		// browser
 		(function() {
 			var opt,
 				sp,
