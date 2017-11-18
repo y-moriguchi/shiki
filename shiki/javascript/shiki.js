@@ -1515,6 +1515,7 @@
 			me.countRootWalls = false;
 			me.fractionOrBinomial = false;
 			me.lengthRootV = 0;
+			me.markTempMatrix = false;
 			return me;
 		}
 		function parseEngine(quadro, trans) {
@@ -2913,10 +2914,16 @@
 						return state;
 					}
 				case st.FPRINTABLE_DRAWTEMP:
-					if(cell.markRootNum ||
-							(cell.markRootWall && !cell.markRootWallInner && cell.getChar() !== 'v')) {
+					if(cell.markMatrixRange) {
+						quadro.markTempMatrix = !quadro.markTempMatrix;
+					}
+					if(!quadro.markTempMatrix &&
+							(cell.markRootNum ||
+									(cell.markRootWall && !cell.markRootWallInner && cell.getChar() !== 'v'))) {
+						quadro.markTempMatrix = false;
 						return directSum(state, st.FPRINTABLE_DRAWTEMP2);
 					} else if(cell.isOutsideX()) {
+						quadro.markTempMatrix = false;
 						quadro.moveLeft();
 						return directSum(state, st.FPRINTABLE_DRAWTEMP2);
 					} else {
@@ -3507,6 +3514,14 @@
 						quadro.clearStringBuilder();
 						quadro.newModel();
 						return st.FINIT;
+					} else if(cell.getChar() === '-' &&
+							quadro.getCellRight().getChar() === '-' &&
+							!cell.isProcessed() &&
+							!cell.markSumSign) {
+						cell.markMatrixProcessed = true;
+						cell.markReturn.push('MATRIX_FIRSTCOL');
+						quadro.clearStringBuilder();
+						return st.FINIT;
 					} else if(cell.getChar() === '.' &&
 							quadro.getCellDown().getChar() === '.' &&
 							!cell.isProcessed()) {
@@ -3519,7 +3534,8 @@
 							!cell.isProcessed() &&
 							!cell.markSumSign &&
 							!quadro.isCellBar() &&
-							!quadro.isAccent()) {
+							!quadro.isAccent() &&
+							!(cell.markRootWall || cell.markRoot)) {
 						quadro.fracRootLabel = 'MATRIX_FIRSTCOL';
 						quadro.fracRootGoto = st.FINIT;
 						quadro.fracRootAction = function() {
@@ -3557,6 +3573,14 @@
 						quadro.clearStringBuilder();
 						quadro.newModel();
 						return st.FINIT;
+					} else if(cell.getChar() === '-' &&
+							quadro.getCellRight().getChar() === '-' &&
+							!cell.isProcessed() &&
+							!cell.markSumSign) {
+						cell.markMatrixProcessed = true;
+						cell.markReturn.push('MATRIX');
+						quadro.clearStringBuilder();
+						return st.FINIT;
 					} else if(cell.getChar() === '.' &&
 							quadro.getCellDown().getChar() === '.' &&
 							!cell.isProcessed()) {
@@ -3569,7 +3593,8 @@
 							!cell.isProcessed() &&
 							!cell.markSumSign &&
 							!quadro.isCellBar() &&
-							!quadro.isAccent()) {
+							!quadro.isAccent() &&
+							!(cell.markRootWall || cell.markRoot)) {
 						quadro.fracRootLabel = 'MATRIX';
 						quadro.fracRootGoto = st.FINIT;
 						quadro.fracRootAction = function() {
