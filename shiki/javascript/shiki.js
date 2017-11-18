@@ -1297,16 +1297,19 @@
 			me.isAboveSlashRootWall = function() {
 				var i,
 					cell,
-					poschar,
+					posok,
 					ret = true;
-				poschar = me.get().getChar();
+				posok = me.get().getChar() === ' ' ||
+						(me.get().getChar() === 'v' && /[_\/]/.test(getPosRel(1, -1).getChar()));
 				for(i = 0;; i++) {
 					cell = getPosRel(0, -i);
-					if((cell.markRoot || cell.markRootWall) && !cell.markRootWallInner) {
+					if(cell.isOutsideY()) {
+						throw 'Internal Error';
+					} else if((cell.markRoot || cell.markRootWall) && !cell.markRootWallInner) {
 						return ((/[_]/.test(cell.getChar()) && ret) ||
-								(/[\/]/.test(cell.getChar()) && /[ v]/.test(poschar)));
+								(/[\/]/.test(cell.getChar()) && posok));
 					} else if(!cell.markRootWallInner && !cell.isWhitespace()) {
-						if(!/[ v]/.test(poschar)) {
+						if(!posok) {
 							return false;
 						} else {
 							ret = i === 0;
@@ -2546,6 +2549,8 @@
 							cell.markMatrixRowSeparator ||
 							cell.markCasesRowSeparator ||
 							cell.markRootWall ||
+							(cell.markTemp & MARK_TEMP_FPOW) > 0 ||
+							(cell.markTemp & MARK_TEMP_FSUB) > 0 ||
 							cell.isProcessed()) {
 						quadro.moveDown();
 						return st.FPRINTABLE_V_NUMRET;
