@@ -26,7 +26,8 @@
 		useQuantumBracket: true,
 		useVerticalBarAsDifference: true,
 		useUnicodeSigmaAsSum: true,
-		useUnicodePiAsProduct: true
+		useUnicodePiAsProduct: true,
+		usePlanckConstant: true
 	};
 	function extend(base, extension) {
 		var i, res = {};
@@ -115,6 +116,8 @@
 		printableRE = new RegExp('[\n' + printableREStr + ']');
 
 		var mathChars = {
+			'\'': '^\\prime',
+			'"':  '^{\\prime\\prime}',
 			'Α': '\\Alpha',
 			'α': '\\alpha',
 			'Β': '\\Beta',
@@ -166,6 +169,16 @@
 			'°': '^\\circ',
 			'△': '\\triangle',
 			'□': '\\Box',
+			'＊': '*',
+			'＋': '+',
+			'－': '-',
+			'．': '.',
+			'＜': '<',
+			'＝': '=',
+			'＞': '>',
+			'＠': '@',
+			'～': '\\sim',
+			'\u301c': '\\sim',
 			'\u00ac': '\\lnot',
 			'\u00b1': '\\pm',
 			'\u00d7': '\\times',
@@ -233,20 +246,34 @@
 			'!=': '\\neq',
 			'=/=': '\\neq',
 			'_|_': '\\perp',
+			'<-': '\\leftarrow',
+			'<=': '\\Leftarrow',
+			'<--': '\\longleftarrow',
+			'<==': '\\Longleftarrow',
+			'->': '\\to',
 			'=>': '\\Rightarrow',
-			'|=': '\\models',
+			'-->': '\\longrightarrow',
+			'==>': '\\Longrightarrow',
+			'<->': '\\leftrightarrow',
 			'<=>': '\\Leftrightarrow',
+			'<-->': '\\longleftrightarrow',
+			'<==>': '\\Longleftrightarrow',
+			'|=': '\\models',
+			'|->': '\\mapsto',
 			'<': '\\lt',
 			'>': '\\gt',
-			'<=': '\\leq',
+			'=<': '\\leq',
 			'>=': '\\geq',
 			'>>': '\\ll',
+			'>>>': '\\lll',
 			'<<': '\\gg',
+			'<<<': '\\ggg',
 			' |-': '\\vdash',
 			' -|': '\\dashv',
 			'~': '\\sim',
+			'<~': '\\lesssim',
+			'>~': '\\gtrsim',
 			'||': '\\parallel',
-			'->': '\\to',
 			'oo': '\\infty',
 			'...': '\\cdots',
 			'sin': '\\sin',
@@ -272,6 +299,7 @@
 			'max': '\\max',
 			'min': '\\min',
 			'lim': '\\lim',
+			'Pr': '\\Pr',
 			'grad': '\\mathrm{grad}\\,',
 			'rot': '\\mathrm{rot}\\,',
 			'div': '\\mathrm{div}\\,',
@@ -433,7 +461,13 @@
 				boldFn,
 				quantumBracket = false;
 			upfunctions = {
-				'_': function(x) { return "\\bar{" + x + "}"; },
+				'_': function(x) {
+					if(x === 'h' && opt.usePlanckConstant) {
+						return "\\hbar";
+					} else {
+						return "\\bar{" + x + "}";
+					}
+				},
 				'~': function(x) { return "\\tilde{" + x + "}"; },
 				'.': function(x) { return "\\dot{" + x + "}"; },
 				'^': function(x) { return "\\hat{" + x + "}"; },
@@ -628,13 +662,19 @@
 				return (getPosRelChar(-1, 0) === '|' &&
 						getPosRelChar( 0, 0) === '|');
 			}
+			function isMapsto() {
+				return (getPosRelChar( 0, 0) === '|' &&
+						getPosRelChar( 1, 0) === '-' &&
+						getPosRelChar( 2, 0) === '>');
+			}
 			function isOperatorWithBar() {
 				return (isPerp() ||
 						isModels() ||
 						isVdash() ||
 						isDashv() ||
 						isParallel1() ||
-						isParallel2());
+						isParallel2() ||
+						isMapsto());
 			}
 			function builderToChar(len) {
 				var j, l, up;
