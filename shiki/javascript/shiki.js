@@ -1825,7 +1825,6 @@
 			st.addState("FRET_ROOT_BASE2");
 			st.addState("FRET_ROOT_NUM");
 			st.addState("FRET_ROOT_NUM2");
-			st.addState("FRET_ROOT_NUM3");
 			st.addState("FRET_SUM_UP");
 			st.addState("FRET_SUM_UP_2");
 			st.addState("FRET_SUM_UP_SCANDOWN");
@@ -2225,6 +2224,21 @@
 							cell.markProcessed();
 							quadro.moveRight();
 							return state;
+						} else if((function () {
+									// find square root below this point
+									var i,
+										cell;
+									for(i = 1;; i++) {
+										cell = quadro.getCellRel(0, i);
+										if(cell.isBoundY()) {
+											return false;
+										} else if(cell.getChar() === 'v' &&
+												/[_\/]/.test(quadro.getCellRel(1, i - 1).getChar())) {
+											return true;
+										}
+									}
+								})()) {
+							return st.FPRINTABLE_SPC_ROOT_2;
 						} else if(quadro.hasSuperScript() || quadro.hasSuperBound()) {
 							return st.FPRINTABLE_RET;
 						} else if(quadro.hasSubScript() || quadro.hasSubBound()) {
@@ -2592,7 +2606,7 @@
 							cell.markRootWall ||
 							(cell.markTemp & MARK_TEMP_FPOW) > 0 ||
 							(cell.markTemp & MARK_TEMP_FSUB) > 0 ||
-							cell.isProcessed()) {
+							(cell.isProcessed() && !cell.isWhitespace())) {
 						quadro.moveDown();
 						return st.FPRINTABLE_V_NUMRET;
 					} else if(cell.isPrintable()) {
@@ -3027,6 +3041,9 @@
 						quadro.clearStringBuilder();
 						quadro.newModel();
 						return st.FINIT;
+					} else if(cell.getChar() === 'v' && /[_\/]/.test(quadro.getCellRel(1, -1).getChar())) {
+						quadro.moveUp().moveLeft();
+						return st.FSUB_RET_DOWN;
 					} else if(cell.isPrintable() && !quadro.isCellBar() && !quadro.isAccent()) {
 						quadro.fracRootLabel = 'SUB';
 						quadro.fracRootGoto = st.FINIT;
@@ -4539,8 +4556,7 @@
 						return state;
 					}
 				case st.FRET_ROOT_NUM:
-					if(cell.markRootNum) {
-						quadro.moveDown();
+					if(cell.markRoot || cell.markRootWall) {
 						return st.FRET_ROOT_NUM2;
 					} else {
 						quadro.moveRight();
@@ -4548,20 +4564,11 @@
 					}
 				case st.FRET_ROOT_NUM2:
 					if(cell.markRoot) {
-						quadro.countRootWalls.unshift(quadro.popModel());
-						return directSum(NEXT_ROOT, st.FPRINTABLE_DRAWTEMP);
-					} else if(cell.getChar() === 'v' && cell.markRootWallInner) {
-						quadro.countRootWalls.push(quadro.popModel());
-						quadro.moveRight();
-						return st.FPRINTABLE_V_COUNT;
-					} else if(cell.markRootWall) {
-						return st.FRET_ROOT_NUM3;
-					} else {
-						quadro.moveDown();
-						return state;
-					}
-				case st.FRET_ROOT_NUM3:
-					if(cell.markRoot) {
+						if(quadro.moveToRootV()) {
+							quadro.get().markRoot = 'MOVE';
+							quadro.get().markProcessed();
+						}
+						quadro.flushBuilder();
 						quadro.countRootWalls.unshift(quadro.popModel());
 						return directSum(NEXT_ROOT, st.FPRINTABLE_DRAWTEMP);
 					} else if(cell.getChar() === 'v' && cell.markRootWallInner) {
