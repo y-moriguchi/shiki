@@ -26,7 +26,7 @@
 		useQuantumBracket: true,
 		useVerticalBarAsDifference: true,
 		useUnicodeSigmaAsSum: true,
-		useUnicodePiAsProduct: true,
+		useUnicodePiAsProduct: false,
 		usePlanckConstant: true
 	};
 	function extend(base, extension) {
@@ -528,6 +528,17 @@
 						!getPosRel(0,  1 + yoffset).markSumSign &&
 						!getPosRel(1,  1 + yoffset).markSumSign);
 			}
+			function isSumAsciiShort(yoffset) {
+				var up = getPosRelChar(0, -1 + yoffset),
+					cn = getPosRelChar(0,  0 + yoffset),
+					dn = getPosRelChar(0,  1 + yoffset);
+				return (/[\-_]/.test(up) &&
+						cn === '>' &&
+						/[\-]/.test(dn) &&
+						!getPosRel(0,  0 + yoffset).markSumSign &&
+						!getPosRel(0, -1 + yoffset).markSumSign &&
+						!getPosRel(0, -1 + yoffset).markSumSign);
+			}
 			function isIntAscii(yoffset, center) {
 				return (getPosRelChar(0,  0 + yoffset) === ' ' &&
 						getPosRelChar(1,  0 + yoffset) === center &&
@@ -564,6 +575,12 @@
 						!getPosRel(4, -1 + yoffset).markSumSign &&
 						!getPosRel(1,  1 + yoffset).markSumSign &&
 						!getPosRel(3,  1 + yoffset).markSumSign);
+			}
+			function isProdAsciiShort(yoffset) {
+				return (getPosRelChar(0, 0) === 'T' &&
+						getPosRelChar(1, 0) === 'T' &&
+						!getPosRel(0, 0).markSumSign &&
+						!getPosRel(1, 0).markSumSign);
 			}
 			function isSumMulti() {
 				return (opt.useUnicodeSigmaAsSum &&
@@ -850,11 +867,11 @@
 				return me;
 			};
 			me.moveUpIfNotMulti = function() {
-				yPos -= me.get().getChar() === '\n' ? 0 : 1;
+				yPos -= /[T\n]/.test(me.get().getChar()) ? 0 : 1;
 				return me;
 			};
 			me.moveDownIfNotMulti = function() {
-				yPos += me.get().getChar() === '\n' ? 0 : 1;
+				yPos += /[T\n]/.test(me.get().getChar()) ? 0 : 1;
 				return me;
 			};
 			me.clearStringBuilder = function() {
@@ -1182,6 +1199,9 @@
 			me.isSumAscii = function(yoffset) {
 				return isSumAscii(yoffset === void(0) ? 0 : yoffset);
 			};
+			me.isSumAsciiShort = function(yoffset) {
+				return isSumAsciiShort(yoffset === void(0) ? 0 : yoffset);
+			};
 			me.isIntAscii = function(yoffset) {
 				return isIntAscii(yoffset === void(0) ? 0 : yoffset, '|');
 			};
@@ -1190,6 +1210,9 @@
 			};
 			me.isProdAscii = function(yoffset) {
 				return isProdAscii(yoffset === void(0) ? 0 : yoffset);
+			};
+			me.isProdAsciiShort = function(yoffset) {
+				return isProdAsciiShort(yoffset === void(0) ? 0 : yoffset);
 			};
 			me.isSumMulti = function() { return isSumMulti(); };
 			me.isIntMulti = function() { return isIntMulti(); };
@@ -1204,9 +1227,11 @@
 			me.isDdots = function() { return isDdots(); };
 			me.isSumInt = function(yoffset) {
 				return (me.isSumAscii(yoffset) ||
+						me.isSumAsciiShort(yoffset) ||
 						me.isIntAscii(yoffset) ||
 						me.isOintAscii(yoffset) ||
 						me.isProdAscii(yoffset) ||
+						me.isProdAsciiShort(yoffset) ||
 						me.isSumMulti(yoffset) ||
 						me.isIntMulti(yoffset) ||
 						me.isDintMulti(yoffset) ||
@@ -1663,12 +1688,14 @@
 			st.addState("FPRINTABLE_V_NUMRET_3");
 			st.addState("FPRINTABLE_V_NUM2");
 			st.addState("FPRINTABLE_SUM_ASCII");
+			st.addState("FPRINTABLE_SUM_ASCII_SHORT");
 			st.addState("FPRINTABLE_INT_ASCII");
 			st.addState("FPRINTABLE_INT_ASCII_2");
 			st.addState("FPRINTABLE_INT_ASCII_3");
 			st.addState("FPRINTABLE_INT_ASCII_4");
 			st.addState("FPRINTABLE_OINT_ASCII");
 			st.addState("FPRINTABLE_PROD_ASCII");
+			st.addState("FPRINTABLE_PROD_ASCII_SHORT");
 			st.addState("FPRINTABLE_SUM_MULTI");
 			st.addState("FPRINTABLE_INT_MULTI");
 			st.addState("FPRINTABLE_INT_MULTI_2");
@@ -1891,12 +1918,16 @@
 			function getSumIntState(quadro) {
 				if(quadro.isSumAscii()) {
 					return st.FPRINTABLE_SUM_ASCII;
+				} else if(quadro.isSumAsciiShort()) {
+					return st.FPRINTABLE_SUM_ASCII_SHORT;
 				} else if(quadro.isIntAscii()) {
 					return st.FPRINTABLE_INT_ASCII;
 				} else if(quadro.isOintAscii()) {
 					return st.FPRINTABLE_OINT_ASCII;
 				} else if(quadro.isProdAscii()) {
 					return st.FPRINTABLE_PROD_ASCII;
+				} else if(quadro.isProdAsciiShort()) {
+					return st.FPRINTABLE_PROD_ASCII_SHORT;
 				} else if(quadro.isSumMulti()) {
 					return st.FPRINTABLE_SUM_MULTI;
 				} else if(quadro.isIntMulti()) {
@@ -2665,6 +2696,12 @@
 					quadro.getCellRel(2,  1).markSumSign = true;
 					quadro.storeMathSign.push('\\sum');
 					return st.FPRINTABLE_SUM_INT;
+				case st.FPRINTABLE_SUM_ASCII_SHORT:
+					quadro.getCellRel(0, -1).markSumSign = true;
+					quadro.getCellRel(0,  0).markSumSign = true;
+					quadro.getCellRel(0,  1).markSumSign = true;
+					quadro.storeMathSign.push('\\sum');
+					return st.FPRINTABLE_SUM_INT;
 				case st.FPRINTABLE_INT_ASCII:
 					cell.markIntTempStart = true;
 					quadro.storeMathSign.push(0);
@@ -2711,6 +2748,11 @@
 					quadro.getCellRel(4, -1).markSumSign = true;
 					quadro.getCellRel(1,  1).markSumSign = true;
 					quadro.getCellRel(3,  1).markSumSign = true;
+					quadro.storeMathSign.push('\\prod');
+					return st.FPRINTABLE_SUM_INT;
+				case st.FPRINTABLE_PROD_ASCII_SHORT:
+					quadro.getCellRel(0,  0).markSumSign = true;
+					quadro.getCellRel(1,  0).markSumSign = true;
 					quadro.storeMathSign.push('\\prod');
 					return st.FPRINTABLE_SUM_INT;
 				case st.FPRINTABLE_SUM_MULTI:
