@@ -61,9 +61,11 @@
 		}
 		if(opt.mathBytes === 2) {
 			twoBytesStr += '\u00ac\u00b1\u00d7\u00f7' +
+				'\u2020\u2021\u2026' +
 				'\u2200\u2202\u2203\u2205\u2207-\u2209\u220b\u2212\u2213\u221d-\u2220\u2225-\u222c\u222e' +
 				'\u2234\u2235\u223d\u2243\u2245\u2248\u2252\u2260-\u2262\u2266\u2267\u226a\u226b\u2276\u2277' +
-				'\u2282-\u2287\u228a\u228b\u2295-\u2297\u22a5\u22bf\u22da\u22db\u29bf\uff01-\uff60\uffe0-\uffe6';
+				'\u2282-\u2287\u228a\u228b\u2295-\u2297\u22a5\u22bf\u22da\u22db\u2605\u2606' +
+				'\u29bf\uff01-\uff60\uffe0-\uffe6';
 		}
 		decorateBold = function(x) { return new BoldMathJax(x) };
 
@@ -169,6 +171,11 @@
 			'°': '^\\circ',
 			'△': '\\triangle',
 			'□': '\\Box',
+			'†': '\\dagger',
+			'‡': '\\ddagger',
+			'★': '\\star',
+			'☆': '\\star',
+			'…': '\\cdots',
 			'＊': '*',
 			'＋': '+',
 			'－': '-',
@@ -271,7 +278,7 @@
 			' |-': '\\vdash',
 			' -|': '\\dashv',
 			'~': '\\sim',
-			'<~': '\\lesssim',
+			'~<': '\\lesssim',
 			'>~': '\\gtrsim',
 			'||': '\\parallel',
 			'oo': '\\infty',
@@ -358,7 +365,7 @@
 			me.markSumMathSign = '';
 			me.markReturn = [];
 			me.markNumberOfRootV = [];
-			me.markMatrixRange = false;
+			me.markMatrixRange = 0;
 			me.markMatrixStart = false;
 			me.markMatrixRowSeparator = false;
 			me.markMatrixRowLine = false;
@@ -1879,6 +1886,10 @@
 				MARK_TEMP_FPOW = 2,
 				MARK_TEMP_ROOT = 4,
 				MARK_TEMP_FRAC = 8,
+				MATRIX_UP = 1,
+				MATRIX_DOWN = 2,
+				MATRIX_LEFT = 4,
+				MATRIX_RIGHT = 8,
 				nextLabel,
 				nextState;
 			function isTempRoot(val) {
@@ -2166,7 +2177,7 @@
 					return st.FPRINTABLE;
 				case st.FPRINTABLE:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
 							cell.markCasesRange ||
 							cell.markCmbBoundary) {
 						quadro.moveLeft();
@@ -2284,7 +2295,7 @@
 					}
 				case st.FPRINTABLE_SPC:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
 							cell.markCasesRange ||
 							cell.markCmbBoundary) {
 						quadro.moveLeft().moveLeft();
@@ -2823,7 +2834,7 @@
 					return st.FPRINTABLE_SUM_INT;
 				case st.FPRINTABLE_SUM_INT:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_LEFT) > 0 ||
 							cell.markCasesRange) {
 						quadro.moveRight();
 						return st.FPRINTABLE_SUM_BASELINE;
@@ -2833,7 +2844,7 @@
 					}
 				case st.FPRINTABLE_SUM_BASELINE:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
 							cell.markCasesRange) {
 						quadro.moveLeft();
 						return st.FPRINTABLE_SUM_BASELINE_2;
@@ -2844,7 +2855,7 @@
 					}
 				case st.FPRINTABLE_SUM_BASELINE_2:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_LEFT) > 0 ||
 							cell.markCasesRange ||
 							cell.isProcessed()) {
 						quadro.moveRight();
@@ -2883,7 +2894,7 @@
 					}
 				case st.FPRINTABLE_SUM_SCANUP_3:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_LEFT) > 0 ||
 							cell.markCasesRange ||
 							(cell.isPrintable() && !cell.isTraversed())) {
 						return st.FPRINTABLE_SUM_NOUP;
@@ -2897,10 +2908,8 @@
 					quadro.newModel();
 					return st.FRET_SUM_UP_2;
 				case st.FPRINTABLE_BAR:
-					if(quadro.getCellUp().getChar() === '|' ||
-							quadro.getCellUp().getChar() === '/' ||
-							quadro.getCellDown().getChar() === '|' ||
-							quadro.getCellDown().getChar() === '\\') {
+					if(/[\|\/\-]/.test(quadro.getCellUp().getChar()) &&
+							/[\|\\\-]/.test(quadro.getCellDown().getChar())) {
 						return st.MATRIX;
 					} else {
 						quadro.appendBuilder();
@@ -3010,8 +3019,10 @@
 						return state;
 					}
 				case st.FPRINTABLE_DRAWTEMP:
-					if(cell.markMatrixRange) {
-						quadro.markTempMatrix = !quadro.markTempMatrix;
+					if((cell.markMatrixRange & MATRIX_LEFT) > 0) {
+						quadro.markTempMatrix = true;
+					} else if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
+						quadro.markTempMatrix = false;
 					}
 					if(!quadro.markTempMatrix &&
 							(cell.markRootNum ||
@@ -3070,7 +3081,9 @@
 						return state;
 					}
 				case st.FSUB_SCAN:
-					if(cell.isBoundY() && (!cell.markTemp || cell.markTemp !== MARK_TEMP_ROOT)) {
+					if(cell.isBoundY() && (!cell.markTemp || cell.markTemp !== MARK_TEMP_ROOT) ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
+							cell.markCasesRange) {
 						quadro.moveUp().moveLeft();
 						return st.FSUB_RET_DOWN;
 					} else if(quadro.isMatrixByScanningDown() || quadro.isSumInt(1)) {
@@ -3119,7 +3132,9 @@
 						return state;
 					}
 				case st.FPOW_SCAN:
-					if(cell.isBoundY() || cell.markCmbBoundary) {
+					if(cell.isBoundY() || cell.markCmbBoundary ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
+							cell.markCasesRange) {
 						quadro.moveDown().moveLeft();
 						return st.FPOW_RET_DOWN;
 					} else if(quadro.isMatrixByScanningUp() || quadro.isSumInt(-1)) {
@@ -3343,7 +3358,7 @@
 					}
 				case st.ROOT_CEIL3:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
 							cell.markCasesRange) {
 						quadro.moveLeft();
 						return st.ROOT_CEIL4;
@@ -3474,35 +3489,33 @@
 					return st.MATRIX_RANGE;
 				case st.MATRIX_RANGE:
 					if(cell.getChar() === '|') {
-						cell.markMatrixRange = true;
+						cell.markMatrixRange = MATRIX_LEFT;
 						quadro.moveUp();
 						return state;
 					} else if(cell.getChar() === '/') {
-						cell.markMatrixRange = true;
+						cell.markMatrixRange = MATRIX_LEFT | MATRIX_UP;
 						quadro.moveRight();
 						quadro.matrixType = '()';
 						return st.MATRIX_RANGE_2;
 					} else if(cell.getChar() === '-' && !cell.isProcessed()) {
-						cell.markMatrixRange = true;
+						cell.markMatrixRange = MATRIX_LEFT | MATRIX_UP;
 						quadro.moveRight();
 						quadro.matrixType = '[]';
 						return st.MATRIX_RANGE_2;
 					} else {
-						quadro.moveDown().moveRight();
+						quadro.moveDown()
+						quadro.get().markMatrixRange |= MATRIX_UP;
+						quadro.moveRight();
 						quadro.matrixType = '||';
 						return st.MATRIX_RANGE_2;
 					}
 				case st.MATRIX_RANGE_2:
-					cell.markMatrixRange = true;
+					cell.markMatrixRange = MATRIX_UP;
 					if(cell.isOutsideX()) {
 						throw 'Invalid matrix';
-					} else if(cell.getChar() === '|') {
-						quadro.moveDown();
-						return st.MATRIX_RANGE_3;
-					} else if(cell.getChar() === '\\') {
-						quadro.moveDown();
-						return st.MATRIX_RANGE_3;
-					} else if(cell.getChar() === '-' && !cell.isProcessed()) {
+					} else if(/[\|\\]/.test(cell.getChar()) ||
+							(cell.getChar() === '-' && !cell.isProcessed())) {
+						cell.markMatrixRange |= MATRIX_RIGHT;
 						quadro.moveDown();
 						return st.MATRIX_RANGE_3;
 					} else {
@@ -3511,32 +3524,27 @@
 					}
 				case st.MATRIX_RANGE_3:
 					if(cell.getChar() === '|') {
-						cell.markMatrixRange = true;
+						cell.markMatrixRange = MATRIX_RIGHT;
 						quadro.moveDown();
 						return state;
-					} else if(cell.getChar() === '/') {
-						cell.markMatrixRange = true;
-						quadro.moveLeft();
-						return st.MATRIX_RANGE_4;
-					} else if(cell.getChar() === '-' && !cell.isProcessed()) {
-						cell.markMatrixRange = true;
+					} else if(cell.getChar() === '/' ||
+							(cell.getChar() === '-' && !cell.isProcessed())) {
+						cell.markMatrixRange = MATRIX_RIGHT | MATRIX_DOWN;
 						quadro.moveLeft();
 						return st.MATRIX_RANGE_4;
 					} else {
-						quadro.moveUp().moveLeft();
+						quadro.moveUp();
+						quadro.get().markMatrixRange |= MATRIX_DOWN;
+						quadro.moveLeft();
 						return st.MATRIX_RANGE_4;
 					}
 				case st.MATRIX_RANGE_4:
-					cell.markMatrixRange = true;
+					cell.markMatrixRange = MATRIX_DOWN;
 					if(cell.isOutsideX()) {
 						throw 'Invalid matrix';
-					} else if(cell.getChar() === '|') {
-						quadro.moveUp();
-						return st.MATRIX_RANGE_5;
-					} else if(cell.getChar() === '\\') {
-						quadro.moveUp();
-						return st.MATRIX_RANGE_5;
-					} else if(cell.getChar() === '-' && !cell.isProcessed()) {
+					} else if(/[\|\\]/.test(cell.getChar()) ||
+							(cell.getChar() === '-' && !cell.isProcessed())) {
+						cell.markMatrixRange |= MATRIX_LEFT;
 						quadro.moveUp();
 						return st.MATRIX_RANGE_5;
 					} else {
@@ -3547,20 +3555,20 @@
 					if(cell.markMatrixRange) {
 						return st.MATRIX_SEPARATE_ROW;
 					} else if(cell.getChar() === '|') {
-						cell.markMatrixRange = true;
+						cell.markMatrixRange = MATRIX_LEFT;
 						quadro.moveUp();
 						return state;
 					}
 				case st.MATRIX_SEPARATE_ROW:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_UP) > 0) {
+						quadro.moveRight();
+						return st.MATRIX_SEPARATE_ROW_2;
+					} else {
 						quadro.moveUp();
 						return state;
-					} else {
-						quadro.moveDown().moveDown().moveRight();
-						return st.MATRIX_SEPARATE_ROW_2;
 					}
 				case st.MATRIX_SEPARATE_ROW_2:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						quadro.moveLeft();
 						return st.MATRIX_SEPARATE_ROW_DRAW;
 					} else if(cell.isWhitespace()) {
@@ -3570,7 +3578,7 @@
 						return st.MATRIX_SEPARATE_ROW_3;
 					}
 				case st.MATRIX_SEPARATE_ROW_3:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_LEFT) > 0) {
 						quadro.moveDown();
 						return st.MATRIX_SEPARATE_ROW_4;
 					} else {
@@ -3578,14 +3586,15 @@
 						return state;
 					}
 				case st.MATRIX_SEPARATE_ROW_4:
-					if(quadro.getCellRight().markMatrixRange) {
+					if((quadro.getCellUp().markMatrixRange & MATRIX_DOWN) > 0) {
+						quadro.moveUp();
 						return st.MATRIX_MOVE_LEFT_UP;
 					} else {
 						quadro.moveRight();
 						return st.MATRIX_SEPARATE_ROW_2;
 					}
 				case st.MATRIX_SEPARATE_ROW_DRAW:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_LEFT) > 0) {
 						quadro.moveDown();
 						return st.MATRIX_SEPARATE_ROW_4;
 					} else {
@@ -3598,12 +3607,12 @@
 						quadro.moveUp();
 						return state;
 					} else {
-						quadro.matrixColCount = 0;
-						quadro.moveDown().moveDown().moveRight();
+						quadro.matrixRowCount = quadro.matrixColCount = 0;
+						quadro.moveDown().moveRight();
 						return st.MATRIX_SCAN_FIRSTCOL;
 					}
 				case st.MATRIX_SCAN_FIRSTCOL:
-					if(cell.markMatrixRange) {
+					if((quadro.getCellUp().markMatrixRange & MATRIX_DOWN) > 0) {
 						quadro.moveUp();
 						return quadro.matrixRowCount > 0 ? st.MATRIX_SCAN_BACK : st.MATRIX_SCAN_FIRSTCOL_BACK;
 					} else if(quadro.isSumInt(1)) {
@@ -3648,21 +3657,21 @@
 						return state;
 					}
 				case st.MATRIX_SCAN_FIRSTCOL_BACK:
-					if(cell.markMatrixRange) {
-						quadro.moveDown().moveRight();
+					if((cell.markMatrixRange & MATRIX_UP) > 0) {
+						quadro.moveRight();
 						return st.MATRIX_SCAN_FIRSTCOL_BACK_2;
 					} else {
 						quadro.moveUp();
 						return state;
 					}
 				case st.MATRIX_SCAN_FIRSTCOL_BACK_2:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						throw 'Invalid matrix';
 					} else {
 						return st.MATRIX_SCAN_FIRSTCOL;
 					}
 				case st.MATRIX_SCAN:
-					if(cell.markMatrixRange) {
+					if((quadro.getCellUp().markMatrixRange & MATRIX_DOWN) > 0) {
 						quadro.moveUp();
 						return st.MATRIX_SCAN_BACK;
 					} else if(quadro.isSumInt(1)) {
@@ -3715,7 +3724,7 @@
 						return state;
 					}
 				case st.MATRIX_SCAN_BACK:
-					if(cell.markMatrixRange) {
+					if((quadro.getCellDown().markMatrixRange & MATRIX_UP) > 0) {
 						quadro.moveDown().moveRight();
 						return st.MATRIX_SCAN_BACK_2;
 					} else {
@@ -3738,7 +3747,7 @@
 						return state;
 					}
 				case st.MATRIX_SCAN_BACK_2:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						return st.MATRIX_RESCAN;
 					} else {
 						if(quadro.matrixRowCount > 0) {
@@ -3748,28 +3757,24 @@
 						return st.MATRIX_SCAN;
 					}
 				case st.MATRIX_RESCAN:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_UP) > 0) {
+						return st.MATRIX_RESCAN_2;
+					} else {
 						quadro.moveUp();
 						return state;
-					} else {
-						quadro.moveDown();
-						return st.MATRIX_RESCAN_2;
 					}
 				case st.MATRIX_RESCAN_2:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_LEFT) > 0) {
+						quadro.matrixColCount = 0;
+						quadro.matrixRowCount = 0;
+						quadro.moveRight();
+						return st.MATRIX_RESCAN_3;
+					} else {
 						quadro.moveLeft();
 						return state;
-					} else {
-						quadro.matrixColCount = -1;
-						quadro.matrixRowCount = 0;
-						quadro.moveRight().moveDown();
-						if(quadro.get().markMatrixRowLine) {
-							quadro.matrixColCount++;
-						}
-						return st.MATRIX_RESCAN_3;
 					}
 				case st.MATRIX_RESCAN_3:
-					if(cell.markMatrixRange) {
+					if((quadro.getCellUp().markMatrixRange & MATRIX_DOWN) > 0) {
 						quadro.moveUp();
 						return st.MATRIX_RESCAN_4;
 					} else if(cell.markMatrixRowLine && cell.markMatrixColLine) {
@@ -3797,38 +3802,36 @@
 						return state;
 					}
 				case st.MATRIX_RESCAN_4:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_UP) > 0) {
 						quadro.matrixRowCount = 0;
-						quadro.moveRight().moveDown();
+						quadro.moveRight();
 						return st.MATRIX_RESCAN_5;
 					} else {
 						quadro.moveUp();
 						return state;
 					}
 				case st.MATRIX_RESCAN_5:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						return st.MATRIX_END;
 					} else {
-						if(cell.markMatrixColLine) {
+						if(quadro.getCellLeft().markMatrixColLine) {
 							quadro.matrixColCount++;
 						}
 						return st.MATRIX_RESCAN_3;
 					}
 				case st.MATRIX_END:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_UP) > 0) {
+						return st.MATRIX_END_2;
+					} else {
 						quadro.moveUp();
 						return state;
-					} else {
-						quadro.moveDown();
-						return st.MATRIX_END_2;
 					}
 				case st.MATRIX_END_2:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_LEFT) > 0) {
+						return st.MATRIX_END_3;
+					} else {
 						quadro.moveLeft();
 						return state;
-					} else {
-						quadro.moveRight();
-						return st.MATRIX_END_3;
 					}
 				case st.MATRIX_END_3:
 					if(cell.markMatrixStart) {
@@ -3841,7 +3844,7 @@
 					}
 				case st.MATRIX_END_4:
 					cell.markProcessed();
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						quadro.addModel(new Matrix(quadro.matrixElements, quadro.matrixType));
 						quadro.matrixType = false;
 						if(quadro.isMarkRootEndBelow()) {
@@ -3856,19 +3859,18 @@
 						return state;
 					}
 				case st.MATRIX_END_INIT:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						return st.MATRIX_END_INIT_2;
 					} else {
 						quadro.moveRight();
 						return state;
 					}
 				case st.MATRIX_END_INIT_2:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_UP) > 0) {
+						return st.MATRIX_END_INIT_3;
+					} else {
 						quadro.moveUp();
 						return state;
-					} else {
-						quadro.moveDown();
-						return st.MATRIX_END_INIT_3;
 					}
 				case st.MATRIX_END_INIT_3:
 					if(!cell.markMatrixRange) {
@@ -3882,12 +3884,11 @@
 						return state;
 					}
 				case st.MATRIX_END_INIT_4:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_LEFT) > 0) {
+						return st.MATRIX_END_INIT_5;
+					} else {
 						quadro.moveLeft();
 						return state;
-					} else {
-						quadro.moveRight();
-						return st.MATRIX_END_INIT_5;
 					}
 				case st.MATRIX_END_INIT_5:
 					if(cell.isMatrixEnd()) {
@@ -3899,7 +3900,7 @@
 						return state;
 					}
 				case st.MATRIX_END_INITBASE:
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_LEFT) > 0) {
 						cell.markMatrixInit = true;
 						return st.MATRIX_END_INITBASE_2;
 					} else {
@@ -3949,7 +3950,7 @@
 					}
 				case st.MATRIX_END_INITBASE_FOUND:
 					cell.markProcessed();
-					if(cell.markMatrixRange) {
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						quadro.addModel(new Matrix(quadro.matrixElements, quadro.matrixType));
 						quadro.matrixType = false;
 						if(quadro.isMarkRootEndBelow()) {
@@ -4528,7 +4529,7 @@
 					}
 				case st.FRET_FRAC2_4:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
 							cell.markCasesRange) {
 						quadro.moveLeft();
 						return st.FRET_FRAC2_5;
@@ -4630,7 +4631,7 @@
 					}
 				case st.FRET_SUM_UP_2:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_LEFT) > 0 ||
 							cell.markCasesRange ||
 							cell.isProcessed()) {
 						quadro.moveRight();
@@ -4668,7 +4669,7 @@
 					}
 				case st.FRET_SUM_UP_SCANDOWN_3:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_LEFT) > 0 ||
 							cell.markCasesRange ||
 							(cell.isPrintable() && !cell.isTraversed())) {
 						return st.FRET_SUM_UP_NODOWN;
@@ -4693,7 +4694,7 @@
 					}
 				case st.FRET_SUM_DOWN_2:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_LEFT) > 0 ||
 							cell.markCasesRange) {
 						quadro.moveRight();
 						return st.FRET_SUM_DOWN_3;
@@ -4703,7 +4704,7 @@
 					}
 				case st.FRET_SUM_DOWN_3:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
 							cell.markCasesRange) {
 						quadro.moveLeft();
 						return st.FRET_SUM_DOWN_4;
@@ -4721,7 +4722,7 @@
 					}
 				case st.FRET_SUM_DOWN_5:
 					if(cell.isOutsideX() ||
-							cell.markMatrixRange ||
+							(cell.markMatrixRange & MATRIX_RIGHT) > 0 ||
 							cell.markCasesRange ||
 							(cell.isPrintable() && !cell.isTraversed())) {
 						return st.FPRINTABLE;
@@ -4731,8 +4732,7 @@
 						return state;
 					}
 				case st.FRET_MATRIX_DRAW_ROW_LINE_FIRST:
-					if(cell.markMatrixRange) {
-						quadro.moveLeft();
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						return st.FRET_MATRIX_DRAW_ROW_LINE_FIRST_2;
 					} else {
 						quadro.moveRight();
@@ -4748,16 +4748,14 @@
 						return state;
 					}
 				case st.FRET_MATRIX_DRAW_ROW_LINE:
-					if(cell.markMatrixRange) {
-						quadro.moveRight();
+					if((cell.markMatrixRange & MATRIX_LEFT) > 0) {
 						return st.FRET_MATRIX_DRAW_ROW_LINE_2;
 					} else {
 						quadro.moveLeft();
 						return state;
 					}
 				case st.FRET_MATRIX_DRAW_ROW_LINE_2:
-					if(cell.markMatrixRange) {
-						quadro.moveLeft();
+					if((cell.markMatrixRange & MATRIX_RIGHT) > 0) {
 						return st.FRET_MATRIX_DRAW_ROW_LINE_3;
 					} else {
 						cell.markMatrixRowLine = true;
