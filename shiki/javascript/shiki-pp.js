@@ -10,7 +10,8 @@ var fs = require('fs'),
 	Shiki = require('./shiki.js'),
 	Process = require('child_process'),
 	num = 1,
-	preprocessors;
+	preprocessors,
+	IMGDIR = "img";
 
 function preprocess_md(fileinput, opt, base) {
 	var input,
@@ -20,7 +21,20 @@ function preprocess_md(fileinput, opt, base) {
 		foutput,
 		pngfn,
 		i,
-		state = "INIT";
+		state = "INIT",
+		fstat = null;
+	try {
+		fstat = fs.statSync(IMGDIR);
+	} catch(err) {
+		if(err.code === 'ENOENT') {
+			fs.mkdirSync(IMGDIR, 493);  // 0o755
+		} else {
+			throw err;
+		}
+	}
+	if(fstat && !fstat.isDirectory()) {
+		throw new Error(IMGDIR + " is not a directory");
+	}
 	lines = fileinput.split(/\n/);
 	for(i = 0; i < lines.length; i++) {
 		line = lines[i];
@@ -44,9 +58,9 @@ function preprocess_md(fileinput, opt, base) {
 				foutput += "\\end{document}\n";
 				pngfn = base + "." + ("000" + num).slice(-4);
 				fs.writeFileSync(pngfn + ".tex", foutput);
-				Process.execSync("tex2img " + pngfn + ".tex " + pngfn + ".png");
+				Process.execSync("tex2img " + pngfn + ".tex img/" + pngfn + ".png");
 				fs.unlinkSync(pngfn + ".tex");
-				output += "![tex](" + pngfn + ".png)\n";
+				output += "![tex](img/" + pngfn + ".png)\n";
 				num++;
 			} else {
 				input += line + "\n";
