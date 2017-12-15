@@ -1,0 +1,29 @@
+{
+  "name": "shikiml",
+  "version": "0.0.0",
+  "description": "Markup mathematical formulae by ASCII-art",
+  "main": "shiki-npm.js",
+  "bin" : {
+    "shikiml" : "./shiki-npm.js"
+  },
+  "scripts": {
+    "test": "ava -v"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/y-moriguchi/shiki.git"
+  },
+  "keywords": [
+    "math",
+    "TeX",
+    "markup",
+    "shiki-ml",
+    "ASCII-art"
+  ],
+  "author": "Yuichiro MORIGUCHI",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/y-moriguchi/shiki/issues"
+  },
+  "homepage": "https://github.com/y-moriguchi/shiki#readme"
+}
