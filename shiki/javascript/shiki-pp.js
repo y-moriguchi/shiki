@@ -58,7 +58,7 @@ function preprocess_md(fileinput, opt, base) {
 				foutput += "\\end{document}\n";
 				pngfn = base + "." + ("000" + num).slice(-4);
 				fs.writeFileSync(pngfn + ".tex", foutput);
-				Process.execSync("tex2img " + pngfn + ".tex img/" + pngfn + ".png");
+				Process.execFileSync("tex2img", [pngfn + ".tex", "img/" + pngfn + ".png"]);
 				fs.unlinkSync(pngfn + ".tex");
 				output += "![tex](img/" + pngfn + ".png)\n";
 				num++;
