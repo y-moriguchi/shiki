@@ -9,8 +9,10 @@
  **/
 var fs = require('fs'),
 	Shiki = require('./shiki.js'),
+	common = require('./shiki-common.js'),
 	scaffold = require('./shiki-scaffold.js'),
-	pp = require('./shiki-pp.js');
+	pp = require('./shiki-pp.js'),
+	usage = {};
 
 function parseShiki(input) {
 	var output;
@@ -55,7 +57,8 @@ function direct(file) {
 
 file = process.argv[2]
 if(!file) {
-	console.error('No file is specified');
+	usage.version = common.version;
+	console.error(common.replaceTemplateFile("usage.txt", usage));
 	process.exit(2);
 } else if(file === 'scaffold') {
 	scaffold.scaffold();

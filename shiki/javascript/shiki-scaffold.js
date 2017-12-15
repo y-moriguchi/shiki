@@ -7,8 +7,8 @@
  * http://opensource.org/licenses/mit-license.php
  **/
 var fs = require('fs'),
-	readline = require("readline"),
-	pjson = JSON.parse(fs.readFileSync(__dirname + "/package.json", 'utf8')),
+	readline = require('readline'),
+	common = require('./shiki-common.js'),
 	stream,
 	reader,
 	questions,
@@ -16,20 +16,12 @@ var fs = require('fs'),
 	locale;
 
 function endAction(setting) {
-	var template = fs.readFileSync(__dirname + "/shiki-template.html", 'utf8'),
-		replaced,
+	var replaced,
 		tmp;
-	function replaceStr(str, prop) {
-		if(typeof setting[prop] === 'object') {
-			return JSON.stringify(setting[prop], null, 2);
-		} else {
-			return setting[prop];
-		}
-	}
-	replaced = template.replace(/@([^@\n]+)@/g, replaceStr);
+	replaced = common.replaceTemplateFile("shiki-template.html", setting);
 	fs.writeFileSync("index.html", replaced);
 	tmp = fs.readFileSync(__dirname + "/shiki.js", 'utf8');
-	fs.writeFileSync("shiki." + pjson.version + ".js", tmp);
+	fs.writeFileSync("shiki." + common.version + ".js", tmp);
 }
 
 function giveQuestion(state) {
@@ -67,7 +59,7 @@ function giveQuestion(state) {
 function scaffold(opt) {
 	setting = opt ? opt : {};
 	setting.setting = {};
-	setting.version = pjson.version;
+	setting.version = common.version;
 	locale = "";
 	stream = readline.createInterface({
 		input: process.stdin,
