@@ -12,7 +12,9 @@ var fs = require('fs'),
 	common = require('./shiki-common.js'),
 	scaffold = require('./shiki-scaffold.js'),
 	pp = require('./shiki-pp.js'),
-	usage = {};
+	option = require('./shiki-option.js'),
+	usage = {},
+	optProp;
 
 function parseShiki(input) {
 	var output;
@@ -55,17 +57,60 @@ function direct(file) {
 	parseShiki(input);
 }
 
-file = process.argv[2]
-if(!file) {
-	usage.version = common.version;
-	console.error(common.replaceTemplateFile("usage.txt", usage));
-	process.exit(2);
-} else if(file === 'scaffold') {
-	scaffold.scaffold();
-} else if(file === 'direct') {
-	direct(process.argv[3]);
-} else if(file === '-') {
-	readstdin();
-} else {
-	process.exit(pp.preprocess(file, {}));
-}
+optProp = {
+	options: [
+		{
+			shortName: null,
+			longName: "image-dir",
+			property: "direction.imageDir",
+			type: "string",
+			defaultValue: "img"
+		},
+		{
+			shortName: null,
+			longName: "data-uri",
+			property: "direction.dataUri",
+			type: "void"
+		},
+		{
+			longName: true,
+			property: function(option, name, value) {
+				option.option = option.option | {};
+				option.option[name] = value;
+			},
+			type: "variant"
+		}
+	],
+	commands: [
+		{
+			name: "scaffold",
+			action: function(option, argv) {
+				scaffold.scaffold(argv[0] ? argv[0] : "index.html");
+			}
+		},
+		{
+			name: "direct",
+			action: function(option, argv) {
+				direct(process.argv[0]);
+			}
+		},
+		{
+			name: "tex2img",
+			action: function(option, argv) {
+				process.exit(pp.preprocess("tex2img", argv[0], option));
+			}
+		}
+	],
+	"-": function(option, argv) {
+		readstdin();
+	},
+	usage: function() {
+		usage.version = common.version;
+		console.error(common.replaceTemplateFile("usage.txt", usage));
+	},
+	defaultAction: function(option, argv) {
+		process.exit(pp.preprocess("default", argv[0], option));
+	}
+};
+
+option.parseOption(optProp);

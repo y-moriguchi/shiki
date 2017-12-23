@@ -19,7 +19,7 @@ function endAction(setting) {
 	var replaced,
 		tmp;
 	replaced = common.replaceTemplateFile("shiki-template.html", setting);
-	fs.writeFileSync("index.html", replaced);
+	fs.writeFileSync(setting.file, replaced);
 	tmp = fs.readFileSync(__dirname + "/shiki.js", 'utf8');
 	fs.writeFileSync("shiki." + common.version + ".js", tmp);
 }
@@ -56,10 +56,11 @@ function giveQuestion(state) {
 	});
 }
 
-function scaffold(opt) {
+function scaffold(file, opt) {
 	setting = opt ? opt : {};
 	setting.setting = {};
 	setting.version = common.version;
+	setting.file = file;
 	locale = "";
 	stream = readline.createInterface({
 		input: process.stdin,
