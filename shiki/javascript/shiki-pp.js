@@ -9,6 +9,7 @@
 var fs = require('fs'),
 	Shiki = require('./shiki.js'),
 	common = require('./shiki-common.js'),
+	TEX2IMG = common.isWindows ? 'tex2imgc' : 'tex2img',
 	Process = require('child_process'),
 	preprocessors;
 
@@ -54,11 +55,11 @@ function makeTex2img(imageDir, dataUri) {
 		pngfn = base + "." + ("000" + (num++)).slice(-4);
 		fs.writeFileSync(pngfn + ".tex", foutput);
 		if(dataUri) {
-			Process.execFileSync("tex2img", [pngfn + ".tex", pngfn + ".png"]);
+			Process.execFileSync(TEX2IMG, [pngfn + ".tex", pngfn + ".png"]);
 			result = "data:image/png;base64," + fs.readFileSync(pngfn + ".png", "base64");
 			fs.unlinkSync(pngfn + ".png");
 		} else {
-			Process.execFileSync("tex2img", [pngfn + ".tex", imageDir + "/" + pngfn + ".png"]);
+			Process.execFileSync(TEX2IMG, [pngfn + ".tex", imageDir + "/" + pngfn + ".png"]);
 			result = imageDir + "/" + pngfn + ".png";
 		}
 		fs.unlinkSync(pngfn + ".tex");

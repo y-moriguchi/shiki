@@ -28,3 +28,4 @@ function replaceTemplateFile(filename, setting) {
 module.exports.replaceTemplate = replaceTemplate;
 module.exports.replaceTemplateFile = replaceTemplateFile;
 module.exports.version = pjson.version;
+module.exports.isWindows = process.platform === 'win32';
