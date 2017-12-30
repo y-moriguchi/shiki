@@ -73,27 +73,45 @@ function preprocessTex2img(beginPatterns, endPatterns, imgOutput, useDataUri) {
 		endREs;
 	function initPattern(opt) {
 		if(!beginREs) {
-			var i;
+			var i,
+				j;
 			beginREs = [];
 			endREs = [];
 			for(i = 0; i < beginPatterns.length; i++) {
-				beginREs[i] = common.replaceTemplateRegExp(beginPatterns[i], opt, 'i');
+				beginREs[i] = [];
+				for(j = 0; j < beginPatterns[i].length; j++) {
+					beginREs[i][j] = common.replaceTemplateRegExp(beginPatterns[i][j], opt, 'i');
+				}
 				endREs[i] = new RegExp(endPatterns[i], 'i');
 			}
 		}
 	}
-	function matchPattern(line) {
+	function matchPattern(line, lastmatch) {
 		var i,
-			result = {},
 			match;
-		for(i = 0; i < beginREs.length; i++) {
-			if(!!(match = beginREs[i].exec(line))) {
-				result.num = i;
-				result.match = match;
+		function execresult(num, lineno) {
+			var rematch,
+				result = {};
+			if(!!(rematch = beginREs[num][lineno].exec(line))) {
+				result.lineno = lineno + 1;
+				result.num = num;
+				result.match = rematch;
+				result.accept = result.lineno >= beginREs[num].length;
 				return result;
+			} else {
+				return false;
 			}
 		}
-		return false;
+		if(lastmatch) {
+			return execresult(lastmatch.num, lastmatch.lineno);
+		} else {
+			for(i = 0; i < beginREs.length; i++) {
+				if(!!(match = execresult(i, 0))) {
+					return match;
+				}
+			}
+			return false;
+		}
 	}
 	return function(fileinput, opt, base) {
 		var input,
@@ -102,7 +120,7 @@ function preprocessTex2img(beginPatterns, endPatterns, imgOutput, useDataUri) {
 			output = "",
 			i,
 			state = "INIT",
-			match,
+			match = null,
 			dataUri = useDataUri && opt.direction.dataUri;
 			tex2img = makeTex2img(opt.direction.imageDir, dataUri),
 			pngfn = {};
@@ -112,7 +130,7 @@ function preprocessTex2img(beginPatterns, endPatterns, imgOutput, useDataUri) {
 			line = lines[i];
 			switch(state) {
 			case "INIT":
-				if(!!(match = matchPattern(line))) {
+				if(!!(match = matchPattern(line, match)) && match.accept) {
 					state = "LINE";
 					input = "";
 				} else {
@@ -121,13 +139,14 @@ function preprocessTex2img(beginPatterns, endPatterns, imgOutput, useDataUri) {
 				break;
 			case "LINE":
 				if(endREs[match.num].test(line)) {
-					state = "INIT";
 					pngfn.png = tex2img(input, opt.option, base);
 					if(typeof imgOutput === 'string') {
 						output += common.replaceTemplate(imgOutput, pngfn) + "\n";
 					} else {
 						output += imgOutput(pngfn, match.match);
 					}
+					state = "INIT";
+					match = null;
 				} else {
 					input += line + "\n";
 				}
@@ -208,12 +227,12 @@ preprocessors = {
 	"tex2img": [
 		{
 			pattern: /^(.*)\.shiki(\.md)$/,
-			action: preprocessTex2img(["^\\`\\`\\`shiki$"], ["^\\`\\`\\`$"], '![tex](@png@)')
+			action: preprocessTex2img([["^\\`\\`\\`shiki$"]], ["^\\`\\`\\`$"], '![tex](@png@)')
 		},
 		{
 			pattern: /^(.*)\.shiki(\.html?)$/,
 			action: preprocessTex2img(
-						[ptn.pre, ptn.div, ptn.script],
+						[[ptn.pre], [ptn.div], [ptn.script]],
 						['^\\s*<\\/pre>', '^\\s*<\\/div>', '^\\s*<\\/script>'],
 						function(pngfn, match) {
 							var output = '';
@@ -231,6 +250,10 @@ preprocessors = {
 							return output;
 						},
 						true)
+		},
+		{
+			pattern: /^(.*)\.shiki(\.a(scii)?doc)$/,
+			action: preprocessTex2img([["^\\[shiki\\]$", "^-+$"]], ["^-+$"], 'image::@png@[tex]')
 		}
 	],
 	"default": [
