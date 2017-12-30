@@ -14,7 +14,8 @@ var fs = require('fs'),
 	pp = require('./shiki-pp.js'),
 	option = require('./shiki-option.js'),
 	usage = {},
-	optProp;
+	optProp,
+	defaultOptions;
 
 function parseShiki(input) {
 	var output;
@@ -75,7 +76,6 @@ optProp = {
 		{
 			longName: true,
 			property: function(option, name, value) {
-				option.option = option.option | {};
 				option.option[name] = value;
 			},
 			type: "variant"
@@ -113,4 +113,10 @@ optProp = {
 	}
 };
 
-option.parseOption(optProp);
+defaultOptions = {
+	option: {
+		className: "shiki",
+		scriptType: "text/x-shiki"
+	}
+};
+option.parseOption(optProp, defaultOptions);

@@ -11,7 +11,8 @@ var fs = require('fs'),
 	common = require('./shiki-common.js'),
 	TEX2IMG = common.isWindows ? 'tex2imgc' : 'tex2img',
 	Process = require('child_process'),
-	preprocessors;
+	preprocessors,
+	ptn = {};
 
 function makeMkdir(imageDir) {
 	var madedir = false;
@@ -67,7 +68,33 @@ function makeTex2img(imageDir, dataUri) {
 	}
 }
 
-function preprocessTex2img(beginPattern, endPattern, imgOutput, useDataUri) {
+function preprocessTex2img(beginPatterns, endPatterns, imgOutput, useDataUri) {
+	var beginREs,
+		endREs;
+	function initPattern(opt) {
+		if(!beginREs) {
+			var i;
+			beginREs = [];
+			endREs = [];
+			for(i = 0; i < beginPatterns.length; i++) {
+				beginREs[i] = common.replaceTemplateRegExp(beginPatterns[i], opt, 'i');
+				endREs[i] = new RegExp(endPatterns[i], 'i');
+			}
+		}
+	}
+	function matchPattern(line) {
+		var i,
+			result = {},
+			match;
+		for(i = 0; i < beginREs.length; i++) {
+			if(!!(match = beginREs[i].exec(line))) {
+				result.num = i;
+				result.match = match;
+				return result;
+			}
+		}
+		return false;
+	}
 	return function(fileinput, opt, base) {
 		var input,
 			lines,
@@ -75,15 +102,17 @@ function preprocessTex2img(beginPattern, endPattern, imgOutput, useDataUri) {
 			output = "",
 			i,
 			state = "INIT",
+			match,
 			dataUri = useDataUri && opt.direction.dataUri;
 			tex2img = makeTex2img(opt.direction.imageDir, dataUri),
 			pngfn = {};
+		initPattern(opt.option);
 		lines = fileinput.split(/\r?\n/);
 		for(i = 0; i < lines.length; i++) {
 			line = lines[i];
 			switch(state) {
 			case "INIT":
-				if(beginPattern.test(line)) {
+				if(!!(match = matchPattern(line))) {
 					state = "LINE";
 					input = "";
 				} else {
@@ -91,10 +120,14 @@ function preprocessTex2img(beginPattern, endPattern, imgOutput, useDataUri) {
 				}
 				break;
 			case "LINE":
-				if(endPattern.test(line)) {
+				if(endREs[match.num].test(line)) {
 					state = "INIT";
 					pngfn.png = tex2img(input, opt.option, base);
-					output += common.replaceTemplate(imgOutput, pngfn) + "\n";
+					if(typeof imgOutput === 'string') {
+						output += common.replaceTemplate(imgOutput, pngfn) + "\n";
+					} else {
+						output += imgOutput(pngfn, match.match);
+					}
 				} else {
 					input += line + "\n";
 				}
@@ -163,18 +196,40 @@ function preprocess(pptype, file, opt) {
 }
 
 module.exports.preprocess = preprocess;
+ptn.val = '(?:[^\\/>\s]+|\'[^\']+\'|"[^"]+")';
+ptn.valtmp = '(?:@className@|\'(?:[^\'\\s]+\\s+)*@className@(?:\\s+[^\'\\s]+)*\'|"(?:[^"\\s]+\\s+)*@className@(?:\\s+[^"\\s]+)*")';
+ptn.classe = '[^\\/>\\s=]+=' + ptn.val;
+ptn.classes = '(?:\\s*' + ptn.classe + ')*';
+ptn.attr = ptn.classes + '\\s*class=' + ptn.valtmp + ptn.classes;
+ptn.pre = '<(pre)(' + ptn.attr + ')\\s*>';
+ptn.div = '<(div)(' + ptn.attr + ')\\s*>';
+ptn.script = '<(script)\\s+type=(?:\'@scriptType@\'|"@scriptType@")>';
 preprocessors = {
 	"tex2img": [
 		{
 			pattern: /^(.*)\.shiki(\.md)$/,
-			action: preprocessTex2img(/^\`\`\`shiki$/, /^\`\`\`$/, '![tex](@png@)')
+			action: preprocessTex2img(["^\\`\\`\\`shiki$"], ["^\\`\\`\\`$"], '![tex](@png@)')
 		},
 		{
 			pattern: /^(.*)\.shiki(\.html?)$/,
 			action: preprocessTex2img(
-						/^\s*<pre\s+class=["']?shiki['"]?\s*>$/,
-						/^\s*<\/pre>/,
-						'<img src="@png@">',
+						[ptn.pre, ptn.div, ptn.script],
+						['^\\s*<\\/pre>', '^\\s*<\\/div>', '^\\s*<\\/script>'],
+						function(pngfn, match) {
+							var output = '';
+							switch(match[1].toLowerCase()) {
+							case 'pre':
+							case 'div':
+								output += '<div ' + match[2] + '>\n';
+								output += common.replaceTemplate('<img src="@png@">', pngfn) + "\n";
+								output += '</div>\n';
+								break;
+							case 'script':
+								output += common.replaceTemplate('<img src="@png@">', pngfn) + "\n";
+								break;
+							}
+							return output;
+						},
 						true)
 		}
 	],
