@@ -1,3 +1,5 @@
 shikiml Ver. @version@
 usage:
-    shikiml scaffold
+    shikiml [filename.shiki.extension]
+    shikiml scaffold [filename]
+    shikiml tex2img [filename.shiki.extension]

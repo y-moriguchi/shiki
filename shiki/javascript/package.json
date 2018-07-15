@@ -1,6 +1,6 @@
 {
   "name": "shikiml",
-  "version": "0.0.0",
+  "version": "0.0.2",
   "description": "Markup mathematical formulae by ASCII-art",
   "main": "shiki-npm.js",
   "bin" : {
@@ -25,5 +25,5 @@
   "bugs": {
     "url": "https://github.com/y-moriguchi/shiki/issues"
   },
-  "homepage": "https://github.com/y-moriguchi/shiki#readme"
+  "homepage": "https://github.com/y-moriguchi/shiki#README"
 }
