@@ -1295,7 +1295,7 @@
 					} else if(cell.markRoot) {
 						return;
 					} else if(cell.isOutsideX() || cell.isOutsideY()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					}
 				}
 			};
@@ -1310,7 +1310,7 @@
 					} else if(cell.markRootWall && !cell.markRootWallInner) {
 						break;
 					} else if(cell.isOutsideX()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					}
 				}
 				me.moveReturnStackHere(wall);
@@ -1369,7 +1369,7 @@
 				for(i = 0;; i++) {
 					cell = getPosRel(0, -i);
 					if(cell.isOutsideY()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if((cell.markRoot || cell.markRootWall) && !cell.markRootWallInner) {
 						return ((/[_]/.test(cell.getChar()) && ret) ||
 								(/[\/]/.test(cell.getChar()) && posok));
@@ -1410,7 +1410,7 @@
 					if(ch === '_') {
 						break;
 					} else if(ch !== '/') {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else {
 						cell.markRootWall = cell.markRootWallInner = true;
 					}
@@ -1441,7 +1441,7 @@
 					} else if(cell.markRootWall || cell.markRoot) {
 						me.moveLeft().moveDown();
 					} else {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					}
 				}
 			};
@@ -1459,7 +1459,7 @@
 						} else if(cell.markRootWall || cell.markRoot) {
 							me.moveRight().moveUp();
 						} else {
-							throw new Error('Internal Error');
+							throw new Error('Parse failed: maybe illegal input');
 						}
 					}
 				}
@@ -1558,7 +1558,7 @@
 						cell.markBinomialBorder = true;
 						return;
 					} else if(ch !== ' ') {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					}
 					cell.markBinomialBorder = true;
 				}
@@ -1603,7 +1603,7 @@
 					}
 
 					if(count++ > opt.iteration) {
-						throw new Error('Infinite Loop:' + trans.getStateName(state));
+						throw new Error('Infinite Loop: maybe illegal input:' + trans.getStateName(state));
 					}
 				}
 				return true;
@@ -2341,7 +2341,7 @@
 					}
 				case st.FPRINTABLE_SPC_CMB_NOSUB_RET_T:
 					if(cell.isOutsideY()) {
-						throw new Error('InternalError');
+						throw new Error('Parse failed: maybe illegal input');
 					} if(cell.markCmbTemp) {
 						quadro.moveUp();
 						return st.FPRINTABLE_SPC_CMB_SCAN_NOPOW;
@@ -2351,7 +2351,7 @@
 					}
 				case st.FPRINTABLE_SPC_CMB_NOSUB_RET_F:
 					if(cell.isOutsideY()) {
-						throw new Error('InternalError');
+						throw new Error('Parse failed: maybe illegal input');
 					} if(cell.markCmbTemp) {
 						cell.markCmbTemp = false;
 						quadro.moveRight();
@@ -2376,7 +2376,7 @@
 					}
 				case st.FPRINTABLE_SPC_CMB_NOPOW_RET_T:
 					if(cell.isOutsideY()) {
-						throw new Error('InternalError');
+						throw new Error('Parse failed: maybe illegal input');
 					} if(cell.markCmbTemp) {
 						cell.markCmbTemp = false;
 						quadro.moveRight();
@@ -2388,7 +2388,7 @@
 					}
 				case st.FPRINTABLE_SPC_CMB_NOPOW_RET_F:
 					if(cell.isOutsideY()) {
-						throw new Error('InternalError');
+						throw new Error('Parse failed: maybe illegal input');
 					} if(cell.markCmbTemp) {
 						cell.markCmbTemp = false;
 						quadro.moveRight();
@@ -2476,7 +2476,7 @@
 					}
 				case st.FPRINTABLE_SPC_CMB_RET_DOWN:
 					if(cell.isOutsideY()) {
-						throw new Error('InternalError');
+						throw new Error('Parse failed: maybe illegal input');
 					} if(cell.markCmbTemp) {
 						cell.markCmbTemp = false;
 						return st.FPRINTABLE_SPC_2;
@@ -2611,7 +2611,7 @@
 						quadro.countRootWalls = [];
 						return st.FPRINTABLE_V_COUNT;
 					} else {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					}
 				case st.FPRINTABLE_V_COUNT:
 					if(!quadro.isAboveSlashRootWall()) {
@@ -3038,7 +3038,7 @@
 							cell.markTemp = cell.markTemp | MARK_TEMP_ROOT;
 							break;
 						default:
-							throw new Error('Internal Error');
+							throw new Error('Parse failed: maybe illegal input');
 						}
 						quadro.moveRight();
 						return state;
@@ -3058,7 +3058,7 @@
 							quadro.moveUp().moveRight();
 							return st.ROOT_INIT;
 						default:
-							throw new Error('Internal Error');
+							throw new Error('Parse failed: maybe illegal input');
 						}
 					} else {
 						quadro.moveLeft();
@@ -3066,7 +3066,7 @@
 					}
 				case st.FPRINTABLE_RET_LEFT:
 					if(cell.isOutsideX()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.isMarkStart()) {
 						return st.FRET;
 					} else {
@@ -3106,7 +3106,7 @@
 					}
 				case st.FSUB_RET_DOWN:
 					if(cell.isOutsideY()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} if(cell.isProcessed()) {
 						quadro.moveRight();
 						if(quadro.getCellUp().markAccent) {
@@ -3154,7 +3154,7 @@
 					}
 				case st.FPOW_RET_DOWN:
 					if(cell.isOutsideY()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.markTemp) {
 						return st.FPOW_RET_DELTEMP;
 					} else {
@@ -3913,7 +3913,7 @@
 					}
 				case st.MATRIX_END_INITBASE_3:
 					if(!cell.markMatrixRange) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.isMatrixEnd()) {
 						quadro.setMatrixMoveInit();
 						return st.MATRIX_END_INITBASE_FOUND_DOWN;
@@ -4234,7 +4234,7 @@
 						return st.FRET_CMB;
 					default:
 						opt.debuglog(cell.markReturn);
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					}
 				case st.FRET_SUB_FPOW:
 					cell.markSubRet = true;
@@ -4366,7 +4366,7 @@
 					}
 				case st.FRET_POW_AFTER_SUB_DOWN:
 					if(cell.isOutsideY()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.markTemp) {
 						cell.markProcessed();
 						quadro.moveLeft();
@@ -4377,9 +4377,9 @@
 					}
 				case st.FRET_SUB_DRAWPROC1:
 					if(cell.isOutsideY()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.isOutsideX()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.isProcessed()) {
 						quadro.moveRight();
 						return st.FRET_SUB_DRAWPROC2;
@@ -4426,7 +4426,7 @@
 					}
 				case st.FRET_POW_DOWN:
 					if(cell.isOutsideY()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.markTemp) {
 						cell.markProcessed();
 						quadro.moveLeft();
@@ -4437,7 +4437,7 @@
 					}
 				case st.FRET_POW_DRAWPROC1:
 					if(cell.isOutsideY()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.isProcessed()) {
 						quadro.moveRight();
 						return st.FRET_POW_DRAWPROC2;
@@ -4504,7 +4504,7 @@
 					}
 				case st.FRET_FRAC2_2:
 					if(cell.isOutsideX()) {
-						throw new Error('Internal Error');
+						throw new Error('Parse failed: maybe illegal input');
 					} else if(cell.markFraction) {
 						cell.markFraction = false;
 						quadro.moveRight();
@@ -4904,7 +4904,7 @@
 		}
 		PowAfterSub.prototype.toLaTeX = function() {
 			if(!(this.value instanceof Sub)) {
-				throw new Error('Internal Error');
+				throw new Error('TeX output failed: maybe illegal input');
 			} else if(opt.useVerticalBarAsDifference &&
 					this.value.value instanceof GroupFormula &&
 					this.value.value.paren[0] === "[" &&
@@ -4959,9 +4959,9 @@
 		};
 		function Sum(mathsign, up, down) {
 			if(!up) {
-				throw new Error('Internal Error');
+				throw new Error('TeX output failed: maybe illegal input');
 			} else if(!down) {
-				throw new Error('Internal Error');
+				throw new Error('TeX output failed: maybe illegal input');
 			}
 			this.mathsign = mathsign;
 			this.up = up;
