@@ -2889,7 +2889,8 @@
 					if(cell.isOutsideX() ||
 							(cell.markMatrixRange & MATRIX_LEFT) > 0 ||
 							cell.markCasesRange ||
-							(cell.isPrintable() && !cell.isTraversed())) {
+							(cell.isPrintable() && !cell.isTraversed()) ||
+							getSumIntState(quadro)) {
 						return st.FPRINTABLE_SUM_NOUP;
 					} else {
 						quadro.moveUp();
@@ -4664,7 +4665,8 @@
 					if(cell.isOutsideX() ||
 							(cell.markMatrixRange & MATRIX_LEFT) > 0 ||
 							cell.markCasesRange ||
-							(cell.isPrintable() && !cell.isTraversed())) {
+							(cell.isPrintable() && !cell.isTraversed()) ||
+							getSumIntState(quadro)) {
 						return st.FRET_SUM_UP_NODOWN;
 					} else {
 						quadro.moveDown();
@@ -4719,6 +4721,8 @@
 							cell.markCasesRange ||
 							(cell.isPrintable() && !cell.isTraversed())) {
 						return st.FPRINTABLE;
+					} else if(!!(nxt = getSumIntState(quadro))) {
+						return nxt;
 					} else {
 						cell.markProcessed();
 						quadro.moveRight();
