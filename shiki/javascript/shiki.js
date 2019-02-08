@@ -11,7 +11,7 @@
 	var defaultOptions = {
 		greekBytes: 2,
 		mathBytes: 2,
-		debuglog: console.log,
+		debuglog: function() {},
 		iteration: 100000,
 		className: "shiki",
 		scriptType: "text/x-shiki",
@@ -343,6 +343,7 @@
 			me.markRootProcessed = false;
 			me.markRootStartV = false;
 			me.markRootWallInner = false;
+			me.markRootNumRet = false;
 			me.markPow = false;
 			me.markPowProcessed = false;
 			me.markPowRight = false;
@@ -1687,6 +1688,8 @@
 			st.addState("FPRINTABLE_V_NUMRET_2");
 			st.addState("FPRINTABLE_V_NUMRET_3");
 			st.addState("FPRINTABLE_V_NUM2");
+			st.addState("FPRINTABLE_V_NUM_PRINTABLE");
+			st.addState("FPRINTABLE_V_NUM_PRINTABLE2");
 			st.addState("FPRINTABLE_SUM_ASCII");
 			st.addState("FPRINTABLE_SUM_ASCII_SHORT");
 			st.addState("FPRINTABLE_INT_ASCII");
@@ -2175,12 +2178,6 @@
 							cell.markCmbBoundary) {
 						quadro.moveLeft();
 						return st.FPRINTABLE_RET;
-					} else if(cell.markRootNum) {
-						if(cell.isPrintable()) {
-							quadro.appendBuilder();
-							cell.markProcessed();
-						}
-						return st.FPRINTABLE_RET;
 					} else if(cell.markIgnoreSubPow) {
 						cell.markIgnoreSubPow = false;
 						return st.FPRINTABLE_RET;
@@ -2645,7 +2642,6 @@
 						quadro.moveDown();
 						return st.FPRINTABLE_V_NUMRET;
 					} else if(cell.isPrintable()) {
-						cell.markRootNum = true;
 						return st.FPRINTABLE_V_NUM2;
 					} else {
 						quadro.moveUp();
@@ -2686,10 +2682,29 @@
 					}
 				case st.FPRINTABLE_V_NUM2:
 					cell.markReturn.push('ROOT_N');
+					cell.markRootNum = true;
+					cell.markRootNumRet = true;
 					quadro.flushBuilder();
 					quadro.clearStringBuilder();
 					quadro.newModel();
-					return st.FINIT;
+					return st.FPRINTABLE_V_NUM_PRINTABLE;
+				case st.FPRINTABLE_V_NUM_PRINTABLE:
+					if(cell.markRootWall) {
+						quadro.moveLeft();
+						return st.FPRINTABLE_V_NUM_PRINTABLE2;
+					} else {
+						quadro.appendBuilder();
+						cell.markProcessed();
+						quadro.moveRight();
+						return state;
+					}
+				case st.FPRINTABLE_V_NUM_PRINTABLE2:
+					if(cell.markRootNumRet) {
+						return st.FPRINTABLE_RET;
+					} else {
+						quadro.moveLeft();
+						return state;
+					}
 				case st.FPRINTABLE_SUM_ASCII:
 					quadro.getCellRel(1,  0).markSumSign = true;
 					quadro.getCellRel(0, -1).markSumSign = true;
