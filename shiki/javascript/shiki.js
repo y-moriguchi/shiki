@@ -111,8 +111,6 @@
 		printableRE = new RegExp('[\n' + printableREStr + ']');
 
 		var mathChars = {
-			'\'': '^\\prime',
-			'"':  '^{\\prime\\prime}',
 			'Α': '\\Alpha',
 			'α': '\\alpha',
 			'Β': '\\Beta',
@@ -460,7 +458,8 @@
 				boldmath = false,
 				boldskip = false,
 				boldFn,
-				quantumBracket = false;
+				quantumBracket = false,
+				isprime = 0;
 			upfunctions = {
 				'_': function(x) {
 					if(x === 'h' && opt.usePlanckConstant) {
@@ -793,7 +792,18 @@
 						return cell[prop] > th;
 					}
 				}
-			};
+			}
+			function addPrime() {
+				var result = '^{', i = 0;
+				builderToChar();
+				for(i = 0; i < isprime; i++) {
+					result += '\\prime';
+				}
+				result += '}';
+				me.addModel(new Printable(result));
+				isprime = 0;
+				me.clearStringBuilder();
+			}
 			me = {};
 			ilist = input.split(/\n/);
 			for(i = 0; i < ilist.length; i++) {
@@ -1028,6 +1038,17 @@
 						builder += ch;
 						return me;
 					}
+				} else if(isprime > 0) {
+					if(ch === '\'') {
+						isprime++;
+						return me;
+					} else {
+						addPrime();
+						return me.appendBuilder();
+					}
+				} else if(ch === '\'') {
+					isprime++;
+					return me;
 				} else if(!quantumBracket && /[{\(\[]/.test(ch)) {
 					beforech.push([ch === '{' ? '\\{' : ch]);
 					if(!matchMathSequence()) {
@@ -1152,6 +1173,8 @@
 				if(texcharFn) {
 					me.addModel(new Printable(texcharFn('\\' + builder)));
 					texcharFn = false;
+				} else if(isprime > 0) {
+					addPrime();
 				} else {
 					while(matchMathSequence()) {}
 					builderToChar();
