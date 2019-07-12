@@ -2414,8 +2414,10 @@
                         quadro.moveRight();
                         return state;
                     } else if(cell.isWhitespace()) {
-                        if((quadro.getCellRel(0, 1).isWhitespace() && quadro.getCellRel(-1, 1).getChar() === "-" && quadro.getCellRel(-1, 1).isProcessed()) ||
-                                (quadro.getCellRel(0, -1).isWhitespace() && quadro.getCellRel(-1, -1).getChar() === "-" && quadro.getCellRel(-1, -1).isProcessed())) {
+                        if(((quadro.getCellRel(0, 1).isWhitespace() || /[\)\]\}]/.test(quadro.getCellRel(0, 1).getChar())) &&
+                                    quadro.getCellRel(-1, 1).getChar() === "-" && quadro.getCellRel(-1, 1).isProcessed()) ||
+                                ((quadro.getCellRel(0, -1).isWhitespace() || /[\)\]\}]/.test(quadro.getCellRel(0, -1).getChar())) &&
+                                    quadro.getCellRel(-1, -1).getChar() === "-" && quadro.getCellRel(-1, -1).isProcessed())) {
                             quadro.moveLeft();
                             return st.FPRINTABLE_RET;
                         } else if(quadro.getCellUp().isVector()) {
