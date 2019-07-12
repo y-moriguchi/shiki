@@ -299,6 +299,7 @@
             'min': '\\min',
             'lim': '\\lim',
             'Pr': '\\Pr',
+            'gd': '\\mathrm{gd}\\,',
             'grad': '\\mathrm{grad}\\,',
             'rot': '\\mathrm{rot}\\,',
             'div': '\\mathrm{div}\\,',
@@ -792,17 +793,17 @@
                         me.get().getChar() === '|')) {
                     return false;
                 }
-                barcount = me.get().getChar() === '|' ? 1 : -1;
+                barcount = me.get().getChar() === '|' ? 1 : 0;
                 for(i = direction;; i += direction) {
                     cell = getPosRel(0, i);
                     ch = cell.getChar();
                     if((ch === '/' && direction < 0) ||
                             (ch === '\\' && direction > 0) ||
                             ch === '-') {
-                        return true;
+                        return barcount > 0;
                     } else if(ch !== '|') {
                         return barcount > 1;
-                    } else if(barcount > 0) {
+                    } else {
                         barcount++;
                     }
                 }
@@ -909,7 +910,7 @@
                 var ccl, dcl;
                 ccl = me.get();
                 dcl = me.getCellDown();
-                return /[_\->]/.test(ccl.getChar()) && !ccl.isProcessed() && dcl.isPrintable();
+                return /[_\->]/.test(ccl.getChar()) && !ccl.isProcessed() && dcl.isPrintable() && !dcl.isProcessed();
             };
 
             me.moveLeft = function() {
@@ -2413,7 +2414,11 @@
                         quadro.moveRight();
                         return state;
                     } else if(cell.isWhitespace()) {
-                        if(quadro.getCellUp().isVector()) {
+                        if((quadro.getCellRel(0, 1).isWhitespace() && quadro.getCellRel(-1, 1).getChar() === "-" && quadro.getCellRel(-1, 1).isProcessed()) ||
+                                (quadro.getCellRel(0, -1).isWhitespace() && quadro.getCellRel(-1, -1).getChar() === "-" && quadro.getCellRel(-1, -1).isProcessed())) {
+                            quadro.moveLeft();
+                            return st.FPRINTABLE_RET;
+                        } else if(quadro.getCellUp().isVector()) {
                             quadro.appendBuilder();
                             cell.markProcessed();
                             quadro.moveRight();
